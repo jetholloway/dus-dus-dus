@@ -1,0 +1,15 @@
+[package]
+name = "dus-dus-dus"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "dus_dus_dus"
+path = "src/bin.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+burn = { version = "0.13.2", features = ["train", "wgpu"] }
+rand = "0.8.5"
+text_io = "0.1.12"
