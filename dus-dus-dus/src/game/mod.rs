@@ -6,6 +6,8 @@ mod pass_action;
 mod position;
 mod tackle_action;
 
+use crate::game_player::GamePlayer;
+
 pub use action::*;
 pub use board::*;
 pub use game_state::*;

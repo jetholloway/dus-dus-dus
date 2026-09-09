@@ -20,54 +20,56 @@ impl<'a, G: Game, N: NeuralNetwork<G>> MonteCarloTreeSearch<'a, G, N> {
     }
 
     fn search_reward(&mut self, state: &'a G::State) -> Real {
-        if self.game.is_terminal(state) {
-            return self.game.reward(state);
+        let game = self.game;
+        let net = self.net;
+
+        if game.is_terminal(state) {
+            return game.reward(state);
         }
 
         if !self.visited.contains(state) {
             let _ = self.visited.insert(state);
-            let (action_probability, reward) = self.net.action_probability_and_reward(state);
+            let (action_probability, reward) = net.action_probability_and_reward(state);
             *self.state_action_probability.at(state) = action_probability;
             return reward;
         }
 
-        let action = self
-            .game
+        let action = game
             .valid_actions(state)
             .max_by_key(|action| -> Real {
-                self.state_action_reward.at(state).at(action)
-                    + self.exploration_bias
-                        * self.state_action_probability.at(state).at(action)
-                        * self
-                            .state_action_frequency
-                            .at(state)
-                            .values()
-                            .cloned()
-                            .sum::<Real>()
-                            .sqrt()
-                        / (Real::from(1.0) + self.state_action_frequency.at(state).at(action))
+                let action = *action;
+
+                let total_frequency = self
+                    .state_action_frequency
+                    .at(state)
+                    .values()
+                    .cloned()
+                    .sum::<Real>();
+                let frequency = *self.state_action_frequency.at(state).at(action);
+                let probability = *self.state_action_probability.at(state).at(action);
+                let reward = *self.state_action_reward.at(state).at(action);
+
+                reward
+                    + self.exploration_bias * probability * total_frequency.sqrt()
+                        / (Real::from(1.0) + frequency)
             })
             .expect("non-terminal state should have valid actions");
 
-        let next_state = self
-            .game
+        let next_state = game
             .next_state(state, action)
             .expect("valid action should produce next state");
-        let reward_factor = if self.game.acting_player(state) != self.game.acting_player(next_state)
-        {
+        let reward_factor = if game.acting_player(state) != game.acting_player(next_state) {
             Real::from(-1.0)
         } else {
             Real::from(1.0)
         };
         let reward = reward_factor * self.search_reward(next_state);
 
+        let frequency = *self.state_action_frequency.at(state).at(action);
+        let mean_reward = *self.state_action_reward.at(state).at(action);
         *self.state_action_reward.at(state).at(action) =
-            (self.state_action_frequency.at(state).at(action)
-                * self.state_action_reward.at(state).at(action)
-                + reward)
-                / (self.state_action_frequency.at(state).at(action) + Real::from(1.0));
-        *self.state_action_frequency.at(state).at(action) =
-            self.state_action_frequency.at(state).at(action) + Real::from(1.0);
+            (frequency * mean_reward + reward) / (frequency + Real::from(1.0));
+        *self.state_action_frequency.at(state).at(action) = frequency + Real::from(1.0);
         reward
     }
 }

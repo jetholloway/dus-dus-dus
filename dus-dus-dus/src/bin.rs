@@ -1,6 +1,5 @@
 mod game;
 mod game_player;
-mod rl;
 
 use rand::distributions::{Distribution, Uniform};
 use rand::{thread_rng, Rng, RngCore};
