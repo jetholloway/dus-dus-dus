@@ -41,7 +41,7 @@ impl GameState {
         self.board.print();
     }
 
-    pub(super) fn try_apply<F>(&self, update_board: F) -> ActionResult
+    pub(crate) fn try_apply<F>(&self, update_board: F) -> ActionResult
     where
         F: FnOnce(&mut Board),
     {
@@ -75,7 +75,7 @@ impl GameState {
         self.turn.action_count
     }
 
-    pub(super) fn turn_count(&self) -> u32 {
+    pub fn turn_count(&self) -> u32 {
         self.turn.turn_count
     }
 

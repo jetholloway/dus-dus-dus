@@ -1,5 +1,5 @@
-mod game;
 mod game_player;
+mod play;
 
 use rand::distributions::{Distribution, Uniform};
 use rand::{thread_rng, Rng, RngCore};
@@ -7,8 +7,9 @@ use std::io::{stdout, Write};
 use std::str::FromStr;
 use text_io::read;
 
-use game::*;
+use engine::*;
 use game_player::*;
+use play::*;
 
 fn main() {
     main_trial();

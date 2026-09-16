@@ -1,5 +1,5 @@
 [workspace]
 members = [
-    "dus-dus-dus", "game", "scratch",
+    "dus-dus-dus", "engine", "game", "scratch",
 ]
 resolver = "2"

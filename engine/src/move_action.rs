@@ -9,11 +9,11 @@ pub struct MoveAction {
 }
 
 impl MoveAction {
-    pub(super) fn new(from: Position, to: Position) -> Self {
+    pub(crate) fn new(from: Position, to: Position) -> Self {
         Self { from, to }
     }
 
-    pub(super) fn try_apply(&self, state: &GameState) -> ActionResult {
+    pub(crate) fn try_apply(&self, state: &GameState) -> ActionResult {
         if self.not_current_players_piece(state) {
             return ActionResult::Invalid("Not current player's piece");
         }

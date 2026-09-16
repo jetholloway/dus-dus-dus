@@ -44,7 +44,7 @@ impl Action {
         Self::Pass(PassAction::new(from, to))
     }
 
-    pub(crate) fn try_apply(&self, state: &GameState) -> ActionResult {
+    pub fn try_apply(&self, state: &GameState) -> ActionResult {
         match self {
             Action::Move(action) => action.try_apply(state),
             Action::Tackle(action) => action.try_apply(state),

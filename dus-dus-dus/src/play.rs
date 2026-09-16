@@ -1,20 +1,5 @@
-mod action;
-mod board;
-mod game_state;
-mod move_action;
-mod pass_action;
-mod position;
-mod tackle_action;
-
 use crate::game_player::GamePlayer;
-
-pub use action::*;
-pub use board::*;
-pub use game_state::*;
-use move_action::*;
-use pass_action::*;
-pub use position::*;
-use tackle_action::*;
+use engine::*;
 
 pub fn play<'a>(
     first: &'a mut dyn GamePlayer,

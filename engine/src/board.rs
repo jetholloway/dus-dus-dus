@@ -24,7 +24,7 @@ struct ClosestPositionToRank {
 }
 
 impl Board {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let mut new = Self {
             spaces: [
                 [Space::Empty; 7],
@@ -63,11 +63,11 @@ impl Board {
         println!("  A  B  C  D  E  F  G")
     }
 
-    pub(super) fn ball_trapped(&self) -> bool {
+    pub(crate) fn ball_trapped(&self) -> bool {
         !self.path_to_rank(self.ball, 0) || !self.path_to_rank(self.ball, 6)
     }
 
-    pub(super) fn has_winner(&self, player: Player) -> bool {
+    pub(crate) fn has_winner(&self, player: Player) -> bool {
         if (player == Player::First && self.ball.y != 6)
             || (player == Player::Second && self.ball.y != 0)
         {
@@ -77,7 +77,7 @@ impl Board {
         self.space(self.ball) == Space::Piece(player)
     }
 
-    pub(super) fn space(&self, position: Position) -> Space {
+    pub fn space(&self, position: Position) -> Space {
         if Self::invalid_position(position) {
             return Space::Invalid;
         }
@@ -85,11 +85,11 @@ impl Board {
         self.spaces[position.x as usize][position.y as usize]
     }
 
-    pub(super) fn ball(&self) -> Position {
+    pub fn ball(&self) -> Position {
         self.ball
     }
 
-    pub(super) fn set_space(&mut self, position: Position, space: Space) {
+    pub(crate) fn set_space(&mut self, position: Position, space: Space) {
         if Self::invalid_position(position) {
             return;
         }
@@ -97,7 +97,7 @@ impl Board {
         self.spaces[position.x as usize][position.y as usize] = space;
     }
 
-    pub(super) fn set_ball(&mut self, position: Position) {
+    pub(crate) fn set_ball(&mut self, position: Position) {
         self.ball = position;
     }
 
