@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use super::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PassAction {
     from: Position,
     to: Position,
@@ -11,6 +11,14 @@ pub struct PassAction {
 impl PassAction {
     pub(crate) fn new(from: Position, to: Position) -> Self {
         Self { from, to }
+    }
+
+    pub fn from(&self) -> Position {
+        self.from
+    }
+
+    pub fn to(&self) -> Position {
+        self.to
     }
 
     pub(crate) fn try_apply(&self, state: &GameState) -> ActionResult {

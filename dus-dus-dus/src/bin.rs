@@ -1,7 +1,6 @@
 mod game_player;
 mod play;
 
-use rand::distributions::{Distribution, Uniform};
 use rand::{thread_rng, Rng, RngCore};
 use std::io::{stdout, Write};
 use std::str::FromStr;
@@ -91,107 +90,25 @@ impl GamePlayer for ConsolePlayer {
 
 pub struct RandomPlayer {
     rng: Box<dyn RngCore>,
-    u0to6: Uniform<i8>,
-    positions: [Position; 49],
 }
 
 impl RandomPlayer {
-    const MOVE_TOS: [Displacement; 8] = [
-        Displacement { x: -2, y: 0 },
-        Displacement { x: -1, y: 0 },
-        Displacement { x: 1, y: 0 },
-        Displacement { x: 2, y: 0 },
-        Displacement { x: 0, y: -2 },
-        Displacement { x: 0, y: -1 },
-        Displacement { x: 0, y: 1 },
-        Displacement { x: 0, y: 2 },
-    ];
-
-    const TACKLE_TOS: [Displacement; 9] = [
-        Displacement { x: 0, y: 0 },
-        Displacement { x: 1, y: 0 },
-        Displacement { x: 1, y: 1 },
-        Displacement { x: 0, y: 1 },
-        Displacement { x: -1, y: 1 },
-        Displacement { x: -1, y: 0 },
-        Displacement { x: -1, y: -1 },
-        Displacement { x: 0, y: -1 },
-        Displacement { x: 1, y: -1 },
-    ];
-
     pub fn new() -> Self {
-        let mut new = Self {
+        Self {
             rng: Box::new(thread_rng()),
-            u0to6: Uniform::from(0..7),
-            positions: [Position { x: 0, y: 0 }; 49],
-        };
-
-        for x in 0..7i8 {
-            for y in 0..7i8 {
-                new.positions[(x + 7 * y) as usize] = Position { x, y };
-            }
         }
-
-        new
-    }
-
-    fn gen_position(&mut self) -> Position {
-        let x = self.u0to6.sample(&mut self.rng);
-        let y = self.u0to6.sample(&mut self.rng);
-        Position { x, y }
     }
 }
 
 impl GamePlayer for RandomPlayer {
     fn next_action(&mut self, state: &GameState) -> Action {
-        let move_froms: Vec<Position> = self
-            .positions
-            .iter()
-            .filter(|position| state.space(**position) == Space::Piece(state.current_player()))
-            .cloned()
-            .collect();
-
-        let tackle_froms: Vec<Position> = move_froms
-            .iter()
-            .filter(|position| position.taxicab_distance(state.ball()) == 1)
-            .cloned()
-            .collect();
-
-        let pass_froms = if state.space(state.ball()) == Space::Piece(state.current_player()) {
-            vec![state.ball()]
-        } else {
-            Vec::new()
-        };
-
-        let mut action_type_froms = Vec::new();
-
-        for move_from in &move_froms {
-            action_type_froms.push((ActionType::Move, *move_from));
-        }
-
-        for tackle_from in tackle_froms {
-            action_type_froms.push((ActionType::Tackle, tackle_from));
-        }
-
-        for pass_from in pass_froms {
-            action_type_froms.push((ActionType::Pass, pass_from));
-        }
-
-        let (action_type, from) =
-            &action_type_froms[self.rng.gen_range(0..action_type_froms.len())];
-
-        let to = match action_type {
-            ActionType::Move => *from + Self::MOVE_TOS[self.rng.gen_range(0..Self::MOVE_TOS.len())],
-            ActionType::Tackle => {
-                *from + Self::TACKLE_TOS[self.rng.gen_range(0..Self::TACKLE_TOS.len())]
-            }
-            ActionType::Pass => move_froms[self.rng.gen_range(0..7)],
-        };
-
-        Action::new(*action_type, *from, to)
+        let actions = state.valid_actions();
+        actions[self.rng.gen_range(0..actions.len())].clone()
     }
 
-    fn invalid_action(&mut self, _error: &str) {}
+    fn invalid_action(&mut self, error: &str) {
+        panic!("RandomPlayer chose an invalid action: {error}");
+    }
 }
 
 impl FromStr for Box<dyn GamePlayer> {

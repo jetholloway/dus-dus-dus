@@ -5,6 +5,7 @@ mod move_action;
 mod pass_action;
 mod position;
 mod tackle_action;
+mod valid_actions;
 
 pub use action::*;
 pub use board::*;

@@ -2,7 +2,7 @@ use super::*;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Action {
     Move(MoveAction),
     Tackle(TackleAction),
@@ -16,7 +16,7 @@ pub enum ActionResult {
     Terminal { winner: Player, board: Board },
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ActionType {
     Move,
     Tackle,
@@ -42,6 +42,30 @@ impl Action {
 
     pub fn new_pass(from: Position, to: Position) -> Self {
         Self::Pass(PassAction::new(from, to))
+    }
+
+    pub fn action_type(&self) -> ActionType {
+        match self {
+            Action::Move(_) => ActionType::Move,
+            Action::Tackle(_) => ActionType::Tackle,
+            Action::Pass(_) => ActionType::Pass,
+        }
+    }
+
+    pub fn from(&self) -> Position {
+        match self {
+            Action::Move(action) => action.from(),
+            Action::Tackle(action) => action.from(),
+            Action::Pass(action) => action.from(),
+        }
+    }
+
+    pub fn to(&self) -> Position {
+        match self {
+            Action::Move(action) => action.to(),
+            Action::Tackle(action) => action.to(),
+            Action::Pass(action) => action.to(),
+        }
     }
 
     pub fn try_apply(&self, state: &GameState) -> ActionResult {
