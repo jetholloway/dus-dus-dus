@@ -32,26 +32,20 @@ Actions are written as `MOVE A1 A3`, `PASS A3 D3`, `TACKLE B4 B5`.
 
 ## Prerequisites
 
-A Rust toolchain, then the three command line tools the project drives itself
-with.
+A Rust toolchain, plus two tools:
 
-[`uv`](https://docs.astral.sh/uv/) manages the Python environment. Install the
-prebuilt binary rather than building it from source, which is slow and needs a
-recent rustc:
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-[`just`](https://just.systems/) runs the project's commands and
-[`maturin`](https://www.maturin.rs/) builds the Python extension:
+- [`micromamba`](https://mamba.readthedocs.io/) manages the Python environment.
+  It also provides Python itself, so no system Python is needed.
+- [`just`](https://just.systems/) runs the project's commands. On Debian:
 
 ```bash
-cargo install just maturin
+sudo apt install just
 ```
 
-If `cargo install uv` is preferred, pin a version that your rustc supports;
-cargo names one in the error when the latest is too new.
+`just` has to live outside the Python environment, because it is what creates
+that environment. Everything else the project needs, including
+[`maturin`](https://www.maturin.rs/), is listed in `environment.yml` and
+installed by `just sync`.
 
 ## Getting started
 
@@ -62,15 +56,20 @@ just --list
 lists every command. The common ones:
 
 ```bash
+just sync          # create or update the Python environment
 just test          # Rust tests
 just trial         # play random games and report win counts
-just sync          # create or update the Python environment
 ```
 
-`just sync` puts the virtualenv in `~/.venvs/dus-dus-dus` rather than in the
-project, so it is not synced by any file syncing you have on the project
-directory. Running `uv` directly instead of through `just` will create `.venv`
-in the project unless you export `UV_PROJECT_ENVIRONMENT` yourself.
+The environment is called `dus-dus-dus` and micromamba keeps it outside the
+project directory, so nothing large lands in the repository. The recipes reach
+into it with `micromamba run`, so they work whether or not it is activated.
+Activating it also works if you would rather run `pytest` and `maturin`
+directly:
+
+```bash
+micromamba activate dus-dus-dus
+```
 
 Build in release mode for anything that plays a lot of games. A debug build is
 roughly sixteen times slower.

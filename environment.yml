@@ -1,0 +1,9 @@
+name: dus-dus-dus
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.13
+  - maturin
+  - pytest

@@ -1,17 +1,22 @@
-# Keep the virtualenv out of Dropbox: .gitignore does not stop Dropbox syncing.
-export UV_PROJECT_ENVIRONMENT := env_var_or_default("UV_PROJECT_ENVIRONMENT", env_var("HOME") + "/.venvs/dus-dus-dus")
+env_name := "dus-dus-dus"
 
 # List the available recipes.
 default:
     @just --list
 
-# Create or update the Python environment.
+# Create the Python environment, or update it if it already exists.
 sync:
-    uv sync
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if micromamba env list | awk '{print $1}' | grep -qx '{{env_name}}'; then
+        micromamba env update -y -f environment.yml
+    else
+        micromamba create -y -f environment.yml
+    fi
 
 # Rebuild the Rust extension into the Python environment.
 develop:
-    uv run maturin develop --manifest-path bindings/Cargo.toml
+    micromamba run -n {{env_name}} maturin develop --manifest-path bindings/Cargo.toml
 
 # Run the Rust tests.
 test:
@@ -19,7 +24,7 @@ test:
 
 # Run the Python tests.
 test-py:
-    uv run pytest
+    micromamba run -n {{env_name}} pytest
 
 # Run every test.
 test-all: test test-py
