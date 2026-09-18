@@ -1,5 +1,10 @@
 env_name := "dus-dus-dus"
 
+# `micromamba shell init` installs a shell function, which a recipe's
+# non-interactive shell does not see. It does export MAMBA_EXE, so prefer that
+# and fall back to a micromamba on PATH.
+mamba := env_var_or_default("MAMBA_EXE", "micromamba")
+
 # List the available recipes.
 default:
     @just --list
@@ -8,15 +13,15 @@ default:
 sync:
     #!/usr/bin/env bash
     set -euo pipefail
-    if micromamba env list | awk '{print $1}' | grep -qx '{{env_name}}'; then
-        micromamba env update -y -f environment.yml
+    if {{mamba}} env list | awk '{print $1}' | grep -qx '{{env_name}}'; then
+        {{mamba}} env update -y -f environment.yml
     else
-        micromamba create -y -f environment.yml
+        {{mamba}} create -y -f environment.yml
     fi
 
 # Rebuild the Rust extension into the Python environment.
 develop:
-    micromamba run -n {{env_name}} maturin develop --manifest-path bindings/Cargo.toml
+    {{mamba}} run -n {{env_name}} maturin develop --manifest-path bindings/Cargo.toml
 
 # Run the Rust tests.
 test:
@@ -24,7 +29,7 @@ test:
 
 # Run the Python tests.
 test-py:
-    micromamba run -n {{env_name}} pytest
+    {{mamba}} run -n {{env_name}} pytest
 
 # Run every test.
 test-all: test test-py

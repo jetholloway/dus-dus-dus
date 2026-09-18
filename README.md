@@ -42,6 +42,12 @@ A Rust toolchain, plus two tools:
 sudo apt install just
 ```
 
+`micromamba shell init` installs a shell function rather than a binary on
+`PATH`, and recipes run in a non-interactive shell that does not see it. The
+recipes therefore call `$MAMBA_EXE`, which that same setup exports, falling
+back to a `micromamba` on `PATH`. If `just sync` reports that micromamba
+cannot be found, check that `MAMBA_EXE` is exported in your shell.
+
 `just` has to live outside the Python environment, because it is what creates
 that environment. Everything else the project needs, including
 [`maturin`](https://www.maturin.rs/), is listed in `environment.yml` and
