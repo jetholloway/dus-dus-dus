@@ -1,0 +1,22 @@
+[project]
+name = "dus-dus-dus"
+version = "0.1.0"
+description = "Python bindings and web UI for the dus-dus-dus game engine"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["maturin>=1.7,<2", "pytest"]
+
+# The Rust extension does not exist yet, so there is nothing to build and
+# install. The bindings commit replaces this with a maturin build backend:
+#
+#   [build-system]
+#   requires = ["maturin>=1.7,<2"]
+#   build-backend = "maturin"
+#
+#   [tool.maturin]
+#   manifest-path = "bindings/Cargo.toml"
+#   module-name = "dus_engine"
+[tool.uv]
+package = false
