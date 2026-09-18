@@ -33,15 +33,25 @@ Actions are written as `MOVE A1 A3`, `PASS A3 D3`, `TACKLE B4 B5`.
 ## Prerequisites
 
 A Rust toolchain, then the three command line tools the project drives itself
-with:
+with.
+
+[`uv`](https://docs.astral.sh/uv/) manages the Python environment. Install the
+prebuilt binary rather than building it from source, which is slow and needs a
+recent rustc:
 
 ```bash
-cargo install uv just maturin
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-- [`uv`](https://docs.astral.sh/uv/) manages the Python environment.
-- [`just`](https://just.systems/) runs the project's commands.
-- [`maturin`](https://www.maturin.rs/) builds the Python extension.
+[`just`](https://just.systems/) runs the project's commands and
+[`maturin`](https://www.maturin.rs/) builds the Python extension:
+
+```bash
+cargo install just maturin
+```
+
+If `cargo install uv` is preferred, pin a version that your rustc supports;
+cargo names one in the error when the latest is too new.
 
 ## Getting started
 
