@@ -1,16 +1,17 @@
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashSet};
 use std::fmt::{Display, Formatter};
 
 use super::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Board {
     spaces: [[Space; 7]; 7],
     ball: Position,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Space {
     Invalid,
     Empty,

@@ -42,7 +42,10 @@ fn main_trial() {
             );
         }
 
-        match play(&mut first, &mut second, false) {
+        match play(&mut first, &mut second, false)
+            .winner
+            .expect("finished game should have a winner")
+        {
             Player::First => first_count += 1,
             Player::Second => second_count += 1,
         }

@@ -1,8 +1,10 @@
 use super::*;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(into = "String", try_from = "String")]
 pub enum Action {
     Move(MoveAction),
     Tackle(TackleAction),
@@ -13,10 +15,10 @@ pub enum Action {
 pub enum ActionResult {
     Invalid(&'static str),
     Valid { state: GameState },
-    Terminal { winner: Player, board: Board },
+    Terminal { state: GameState, winner: Player },
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ActionType {
     Move,
     Tackle,
@@ -74,6 +76,20 @@ impl Action {
             Action::Tackle(action) => action.try_apply(state),
             Action::Pass(action) => action.try_apply(state),
         }
+    }
+}
+
+impl From<Action> for String {
+    fn from(action: Action) -> Self {
+        action.to_string()
+    }
+}
+
+impl TryFrom<String> for Action {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::from_str(value.as_str())
     }
 }
 

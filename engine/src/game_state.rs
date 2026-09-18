@@ -1,27 +1,28 @@
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 use super::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GameState {
     turn: Turn,
     board: Board,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct Turn {
     turn_count: u32,
     player: Player,
     action_count: ActionCount,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Player {
     First,
     Second,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum ActionCount {
     First,
     Second,
@@ -52,19 +53,19 @@ impl GameState {
             return ActionResult::Invalid("Ball trapped");
         }
 
-        if board.has_winner(self.turn.player) {
+        let state = Self {
+            turn: self.turn.next(),
+            board,
+        };
+
+        if state.board.has_winner(self.turn.player) {
             return ActionResult::Terminal {
+                state,
                 winner: self.turn.player,
-                board,
             };
         }
 
-        ActionResult::Valid {
-            state: Self {
-                turn: self.turn.next(),
-                board,
-            },
-        }
+        ActionResult::Valid { state }
     }
 
     pub fn setup(&self) -> bool {

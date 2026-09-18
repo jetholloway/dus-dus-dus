@@ -1,10 +1,11 @@
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 use std::str::FromStr;
 
 pub type Path = Vec<Position>;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Position {
     pub x: i8,
     pub y: i8,

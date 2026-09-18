@@ -5,7 +5,8 @@ pub fn play<'a>(
     first: &'a mut dyn GamePlayer,
     second: &'a mut dyn GamePlayer,
     print: bool,
-) -> Player {
+) -> GameRecord {
+    let mut record = GameRecord::new();
     let mut state = GameState::new();
     if print {
         state.print();
@@ -30,16 +31,22 @@ pub fn play<'a>(
                     println!("PLAYER {} {action}", state.current_player());
                     next_state.print();
                 }
+                record.actions.push(action);
                 state = next_state;
                 continue;
             }
-            ActionResult::Terminal { winner, board } => {
+            ActionResult::Terminal {
+                state: next_state,
+                winner,
+            } => {
                 if print {
                     println!("PLAYER {} {action}", state.current_player());
-                    board.print();
+                    next_state.print();
                     println!("PLAYER {winner} WINS TURN {}", state.turn_count());
                 }
-                return winner;
+                record.actions.push(action);
+                record.winner = Some(winner);
+                return record;
             }
         }
     }
