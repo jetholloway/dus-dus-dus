@@ -84,6 +84,20 @@ impl GameState {
         self.turn.player
     }
 
+    pub fn winner(&self) -> Option<Player> {
+        if self.board.has_winner(Player::First) {
+            Some(Player::First)
+        } else if self.board.has_winner(Player::Second) {
+            Some(Player::Second)
+        } else {
+            None
+        }
+    }
+
+    pub fn is_terminal(&self) -> bool {
+        self.winner().is_some()
+    }
+
     pub fn other_player(&self) -> Player {
         self.turn.player.other()
     }

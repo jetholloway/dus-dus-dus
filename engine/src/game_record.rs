@@ -10,9 +10,17 @@ pub struct GameRecord {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReplayError {
-    InvalidAction { index: usize, error: &'static str },
-    ActionAfterWin { index: usize },
-    WinnerMismatch { recorded: Option<Player>, replayed: Option<Player> },
+    InvalidAction {
+        index: usize,
+        error: &'static str,
+    },
+    ActionAfterWin {
+        index: usize,
+    },
+    WinnerMismatch {
+        recorded: Option<Player>,
+        replayed: Option<Player>,
+    },
 }
 
 impl GameRecord {
@@ -130,6 +138,14 @@ mod tests {
         assert_eq!(states.first(), Some(&GameState::new()));
         assert_eq!(states.last(), Some(&final_state));
         assert!(record.winner.is_some());
+
+        assert_eq!(final_state.winner(), record.winner);
+        assert!(final_state.is_terminal());
+        assert!(!GameState::new().is_terminal());
+        assert!(states[..states.len() - 1]
+            .iter()
+            .all(|state| !state.is_terminal()));
+        assert!(final_state.valid_actions().is_empty());
     }
 
     #[test]
@@ -178,4 +194,3 @@ mod tests {
         );
     }
 }
-

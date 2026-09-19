@@ -3,3 +3,7 @@ members = [
     "dus-dus-dus", "engine", "game", "scratch",
 ]
 resolver = "2"
+
+# The Python bindings are built by maturin, not cargo. Keeping them out of the
+# workspace means `cargo test --workspace` never needs a Python toolchain.
+exclude = ["bindings"]

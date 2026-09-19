@@ -71,6 +71,10 @@ impl Action {
     }
 
     pub fn try_apply(&self, state: &GameState) -> ActionResult {
+        if state.is_terminal() {
+            return ActionResult::Invalid("Game is over");
+        }
+
         match self {
             Action::Move(action) => action.try_apply(state),
             Action::Tackle(action) => action.try_apply(state),

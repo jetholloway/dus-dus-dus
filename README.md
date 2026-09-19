@@ -63,9 +63,14 @@ lists every command. The common ones:
 
 ```bash
 just sync          # create or update the Python environment
+just develop       # build the Python bindings into the environment
 just test          # Rust tests
+just test-py       # Python tests, after just develop
 just trial         # play random games and report win counts
 ```
+
+Re-run `just develop` after changing any Rust in `engine/` or `bindings/`;
+Python only sees the engine as of the last build.
 
 The environment is called `dus-dus-dus` and micromamba keeps it outside the
 project directory, so nothing large lands in the repository. The recipes reach
@@ -86,13 +91,25 @@ roughly sixteen times slower.
 | --- | --- |
 | `engine/` | The game: board, positions, rules, legal action enumeration, game records. No dependencies beyond serde. |
 | `dus-dus-dus/` | Command line binary. Console and random players, and the game loop. |
+| `bindings/` | The `dus_engine` Python module, built with maturin. Outside the Cargo workspace so Rust builds never need Python. |
+| `tests/` | Python tests for the bindings. |
 | `game/` | An unused sketch of a game-agnostic framework with a Monte Carlo tree search. Nothing depends on it. |
 | `scratch/` | A throwaway playground. |
 
 ## Status
 
-The engine is complete and tested. There is no UI yet: `main()` runs a batch of
-random games, and the console player exists but nothing currently reaches it.
+The engine is complete and tested, and usable from Python:
 
-Planned next are Python bindings for the engine, then a web UI with a Python
-server, then multiplayer.
+```python
+from dus_engine import Action, GameState
+
+state = GameState()
+state.valid_actions()                 # [Action('MOVE A1 A3'), ...]
+state = state.apply(Action("MOVE A1 A3"))
+state.winner                          # None until someone scores
+```
+
+There is no UI yet: `main()` runs a batch of random games, and the console
+player exists but nothing currently reaches it.
+
+Planned next are a web UI with a Python server, then multiplayer.
