@@ -10,34 +10,72 @@
 <body>
   <main>
     <header>
-      <h1>Dus Dus Dus</h1>
+      <h1><a href="#">Dus Dus Dus</a></h1>
       <nav>
+        <a href="#">Games</a>
         <button id="new-bot" type="button">New game vs bot</button>
         <button id="new-hotseat" type="button">New hot-seat game</button>
       </nav>
     </header>
 
-    <p id="status" role="status">Start a game to play.</p>
+    <section id="games-view" hidden>
+      <h2>Games</h2>
+      <p id="games-message" class="message" role="alert"></p>
+      <p id="games-empty" hidden>No games yet. Start one above.</p>
+      <table id="games-table" class="games">
+        <thead>
+          <tr><th>Started</th><th>Mode</th><th>Moves</th><th>Result</th><th></th></tr>
+        </thead>
+        <tbody id="games-body"></tbody>
+      </table>
+    </section>
 
-    <div id="board" class="board" aria-label="Board"></div>
+    <section id="play-view" hidden>
+      <p class="subtitle"><span id="play-mode"></span> <a id="play-replay">Watch the replay</a></p>
+      <p id="play-status" class="status" role="status"></p>
+      <div id="play-board" class="board" aria-label="Board"></div>
+      <p id="play-message" class="message" role="alert"></p>
 
-    <p id="message" class="message" role="alert"></p>
+      <details class="help">
+        <summary>How to play</summary>
+        <ul>
+          <li>Click one of your pieces to see what it can do.</li>
+          <li><strong>Move:</strong> click a highlighted empty square.</li>
+          <li><strong>Pass:</strong> with the ball carrier selected, click a highlighted team-mate.</li>
+          <li><strong>Tackle:</strong> select a piece next to the ball, click the ball, then click where to go.</li>
+          <li>Click the selected piece again, or press Escape, to cancel.</li>
+        </ul>
+        <p>The full rules are in the rulebook in the project's <code>docs</code> folder.</p>
+      </details>
 
-    <details class="help">
-      <summary>How to play</summary>
-      <ul>
-        <li>Click one of your pieces to see what it can do.</li>
-        <li><strong>Move:</strong> click a highlighted empty square.</li>
-        <li><strong>Pass:</strong> with the ball carrier selected, click a highlighted team-mate.</li>
-        <li><strong>Tackle:</strong> select a piece next to the ball, click the ball, then click where to go.</li>
-        <li>Click the selected piece again, or press Escape, to cancel.</li>
-      </ul>
-      <p>The full rules are in the rulebook in the project's <code>docs</code> folder.</p>
-    </details>
+      <section class="log">
+        <h2>Moves</h2>
+        <ol id="play-log"></ol>
+      </section>
+    </section>
 
-    <section class="log">
-      <h2>Moves</h2>
-      <ol id="log"></ol>
+    <section id="replay-view" hidden>
+      <p id="replay-title" class="subtitle"></p>
+      <p id="replay-status" class="status" role="status"></p>
+      <div id="replay-board" class="board" aria-label="Board"></div>
+
+      <div id="replay-controls" class="replay-controls" hidden>
+        <button id="replay-first" type="button" aria-label="First position">⏮</button>
+        <button id="replay-prev" type="button" aria-label="Previous move">◀</button>
+        <button id="replay-play" type="button">Play</button>
+        <button id="replay-next" type="button" aria-label="Next move">▶</button>
+        <button id="replay-last" type="button" aria-label="Last position">⏭</button>
+        <input id="replay-slider" type="range" min="0" value="0" aria-label="Move">
+      </div>
+      <p class="hint">Arrow keys step through the moves; Home and End jump to either end.</p>
+
+      <p id="replay-message" class="message" role="alert"></p>
+      <p><a id="replay-continue" hidden>Continue playing this game</a></p>
+
+      <section class="log">
+        <h2>Moves</h2>
+        <ol id="replay-log"></ol>
+      </section>
     </section>
   </main>
 </body>

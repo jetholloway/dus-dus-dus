@@ -1,6 +1,6 @@
 # dus-dus-dus
 
-A board game engine in Rust, with Python bindings and a web UI planned.
+A board game engine in Rust, with Python bindings and a web UI.
 
 ## The game
 
@@ -87,20 +87,6 @@ just trial         # play random games and report win counts
 Re-run `just develop` after changing any Rust in `engine/` or `bindings/`;
 Python only sees the engine as of the last build.
 
-## Playing in the browser
-
-```bash
-just serve
-```
-
-then open <http://127.0.0.1:8000>. Play against a random bot, or hot-seat
-with two people on one browser. A game's address includes its id, so
-reloading the page or bookmarking it returns to the same game.
-
-Games are saved in SQLite at `~/.local/share/dus-dus-dus/games.sqlite`, or
-wherever `DUS_DB` points. It is kept out of the project directory on purpose:
-a file-syncing service copying a live database mid-write can corrupt it.
-
 The environment is called `dus-dus-dus` and micromamba keeps it outside the
 project directory, so nothing large lands in the repository. The recipes reach
 into it with `micromamba run`, so they work whether or not it is activated.
@@ -113,6 +99,28 @@ micromamba activate dus-dus-dus
 
 Build in release mode for anything that plays a lot of games. A debug build is
 roughly sixteen times slower.
+
+## Playing in the browser
+
+```bash
+just serve
+```
+
+then open <http://127.0.0.1:8000>. Play against a random bot, or hot-seat
+with two people on one browser. A game's address includes its id, so
+reloading the page or bookmarking it returns to the same game.
+
+The front page lists every saved game. Any of them can be replayed a move
+at a time, with the arrow keys or the controls under the board, and a game
+still in progress can be picked up where it was left.
+
+A rule change can make a move in an older game illegal. Such a game is
+marked in the list, and its replay runs up to that move and explains why it
+stops there.
+
+Games are saved in SQLite at `~/.local/share/dus-dus-dus/games.sqlite`, or
+wherever `DUS_DB` points. It is kept out of the project directory on purpose:
+a file-syncing service copying a live database mid-write can corrupt it.
 
 ## Layout
 
@@ -141,4 +149,4 @@ state.winner                          # None until someone scores
 
 The browser UI plays full games against a random bot or hot-seat.
 
-Planned next are a game list and replay viewer, then multiplayer.
+Saved games can be listed and replayed. Planned next is multiplayer.

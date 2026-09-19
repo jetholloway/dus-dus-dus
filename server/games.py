@@ -4,7 +4,7 @@ import random
 from dataclasses import dataclass
 from enum import Enum
 
-from dus_engine import Action, GameRecord, GameState, Player
+from dus_engine import Action, GameRecord, GameState, InvalidAction, Player
 
 PLAYER_NAMES = {Player.First: "First", Player.Second: "Second"}
 
@@ -30,6 +30,50 @@ class UnreplayableGame(Exception):
 
 
 @dataclass
+class ReplayFailure:
+    """The first move of a record that the current rules forbid."""
+
+    move: int  # counted from 1
+    player: Player
+    action: str
+    reason: str
+
+    def __str__(self) -> str:
+        return f"Move {self.move} ({self.action}) is not allowed: {self.reason}"
+
+
+def replay(record: GameRecord) -> tuple[list[GameState], ReplayFailure | None]:
+    """The state before the first move and after each one.
+
+    Unlike GameRecord.replay, this stops at the first illegal move rather than
+    failing outright, so a game recorded under older rules can still be shown
+    up to the point where the rules changed.
+    """
+    states = [GameState()]
+
+    for index, action in enumerate(record.actions):
+        try:
+            states.append(states[-1].apply(action))
+        except InvalidAction as error:
+            failure = ReplayFailure(index + 1, states[-1].current_player, str(action), str(error))
+            return states, failure
+
+    return states, None
+
+
+def history_of(states: list[GameState], record: GameRecord) -> list[dict]:
+    """Each replayed move with the player who made it.
+
+    `states` comes from replay(): every state but the last is one a move was
+    played from, so a move the replay stopped at is left out.
+    """
+    return [
+        {"player": PLAYER_NAMES[state.current_player], "action": str(action)}
+        for state, action in zip(states[:-1], record.actions)
+    ]
+
+
+@dataclass
 class Game:
     id: str
     mode: Mode
@@ -43,10 +87,9 @@ class Game:
     @classmethod
     def from_record(cls, id: str, mode: Mode, record: GameRecord) -> "Game":
         """Rebuild a game by replaying its record, which also validates it."""
-        try:
-            states = record.replay()
-        except ValueError as error:
-            raise UnreplayableGame(str(error)) from error
+        states, failure = replay(record)
+        if failure is not None:
+            raise UnreplayableGame(str(failure))
         return cls(id=id, mode=mode, record=record, state=states[-1])
 
     @property
@@ -86,11 +129,8 @@ class Game:
 
     def history(self) -> list[dict]:
         """Every action so far, with the player who made it."""
-        states = self.record.replay()
-        return [
-            {"player": PLAYER_NAMES[state.current_player], "action": str(action)}
-            for state, action in zip(states, self.record.actions)
-        ]
+        states, _ = replay(self.record)
+        return history_of(states, self.record)
 
     def _apply(self, action: Action) -> None:
         self.state = self.state.apply(action)

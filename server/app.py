@@ -7,13 +7,22 @@ import random
 import secrets
 from pathlib import Path
 
-from dus_engine import Position
+from dus_engine import GameState, Position
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .games import PLAYER_NAMES, Game, Mode, NotYourTurn, UnreplayableGame
-from .storage import GameStore, default_db_path
+from .games import (
+    PLAYER_NAMES,
+    Game,
+    Mode,
+    NotYourTurn,
+    ReplayFailure,
+    UnreplayableGame,
+    history_of,
+    replay,
+)
+from .storage import GameStore, StoredGame, default_db_path
 
 STATIC = Path(__file__).parent / "static"
 
@@ -40,11 +49,18 @@ def create_app(db_path: Path | None = None, rng: random.Random | None = None) ->
 
     @app.get("/api/games")
     def list_games() -> list[dict]:
-        return store.summaries()
+        return [summary_payload(stored) for stored in store.list_records()]
 
     @app.get("/api/games/{game_id}")
     def get_game(game_id: str) -> dict:
         return game_payload(_load(game_id))
+
+    @app.get("/api/games/{game_id}/replay")
+    def get_replay(game_id: str) -> dict:
+        stored = store.load_record(game_id)
+        if stored is None:
+            raise HTTPException(404, "No such game")
+        return replay_payload(stored)
 
     @app.post("/api/games/{game_id}/actions")
     def play_action(game_id: str, body: PlayAction) -> dict:
@@ -83,8 +99,7 @@ def create_app(db_path: Path | None = None, rng: random.Random | None = None) ->
     return app
 
 
-def game_payload(game: Game) -> dict:
-    state = game.state
+def state_payload(state: GameState) -> dict:
     pieces = {}
     for x in range(7):
         for y in range(7):
@@ -94,19 +109,78 @@ def game_payload(game: Game) -> dict:
                 pieces[str(position)] = PLAYER_NAMES[owner]
 
     return {
+        "current_player": PLAYER_NAMES[state.current_player],
+        "setup": state.setup,
+        "turn": state.turn_count,
+        "action": state.action_count,
+        "winner": _player(state.winner),
+        "ball": None if state.ball is None else str(state.ball),
+        "pieces": pieces,
+    }
+
+
+def game_payload(game: Game) -> dict:
+    return {
         "id": game.id,
         "mode": game.mode.value,
         "version": game.version,
         "human_players": [PLAYER_NAMES[player] for player in game.human_players],
-        "state": {
-            "current_player": PLAYER_NAMES[state.current_player],
-            "setup": state.setup,
-            "turn": state.turn_count,
-            "action": state.action_count,
-            "winner": None if state.winner is None else PLAYER_NAMES[state.winner],
-            "ball": None if state.ball is None else str(state.ball),
-            "pieces": pieces,
-        },
-        "valid_actions": [str(action) for action in state.valid_actions()],
+        "state": state_payload(game.state),
+        "valid_actions": [str(action) for action in game.state.valid_actions()],
         "history": game.history(),
     }
+
+
+def summary_payload(stored: StoredGame) -> dict:
+    states, failure = replay(stored.record)
+    winner = states[-1].winner
+
+    if failure is not None:
+        status = "unreplayable"
+    elif winner is not None:
+        status = "finished"
+    else:
+        status = "in_progress"
+
+    return {
+        "id": stored.id,
+        "mode": stored.mode.value,
+        "moves": len(stored.record),
+        "status": status,
+        "winner": _player(winner),
+        "problem": None if failure is None else str(failure),
+        "created_at": stored.created_at,
+        "updated_at": stored.updated_at,
+    }
+
+
+def replay_payload(stored: StoredGame) -> dict:
+    """Every position of a game, for stepping through it.
+
+    Frame 0 is the start; frame n is the position after move n. A game the
+    current rules forbid stops at the last legal position, with the failure.
+    """
+    states, failure = replay(stored.record)
+
+    return {
+        "id": stored.id,
+        "mode": stored.mode.value,
+        "frames": [state_payload(state) for state in states],
+        "history": history_of(states, stored.record),
+        "failure": _failure_payload(failure),
+    }
+
+
+def _failure_payload(failure: ReplayFailure | None) -> dict | None:
+    if failure is None:
+        return None
+    return {
+        "move": failure.move,
+        "player": PLAYER_NAMES[failure.player],
+        "action": failure.action,
+        "reason": failure.reason,
+    }
+
+
+def _player(player) -> str | None:
+    return None if player is None else PLAYER_NAMES[player]

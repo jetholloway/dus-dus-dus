@@ -8,6 +8,7 @@ stored state can never drift from the moves that produced it.
 import os
 import sqlite3
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -26,6 +27,24 @@ CREATE TABLE IF NOT EXISTS games (
     updated_at TEXT NOT NULL
 )
 """
+
+
+@dataclass
+class StoredGame:
+    """A row of the games table, before its moves are replayed."""
+
+    COLUMNS = "id, mode, record, created_at, updated_at"
+
+    id: str
+    mode: Mode
+    record: GameRecord
+    created_at: str
+    updated_at: str
+
+    @classmethod
+    def from_row(cls, row) -> "StoredGame":
+        id, mode, record, created_at, updated_at = row
+        return cls(id, Mode(mode), GameRecord.from_json(record), created_at, updated_at)
 
 
 def default_db_path() -> Path:
@@ -71,25 +90,33 @@ class GameStore:
             return cursor.rowcount == 1
 
     def load(self, id: str) -> Game | None:
-        with self._db() as db:
-            row = db.execute("SELECT mode, record FROM games WHERE id = ?", (id,)).fetchone()
+        """The game with this id, ready to play, or None if there isn't one.
 
-        if row is None:
+        Raises UnreplayableGame if the current rules forbid one of its moves.
+        """
+        stored = self.load_record(id)
+        if stored is None:
             return None
+        return Game.from_record(stored.id, stored.mode, stored.record)
 
-        mode, record = row
-        return Game.from_record(id, Mode(mode), GameRecord.from_json(record))
+    def load_record(self, id: str) -> StoredGame | None:
+        """The game's stored moves, without replaying them."""
+        with self._db() as db:
+            row = db.execute(
+                f"SELECT {StoredGame.COLUMNS} FROM games WHERE id = ?", (id,)
+            ).fetchone()
 
-    def summaries(self, limit: int = 50) -> list[dict]:
+        return None if row is None else StoredGame.from_row(row)
+
+    def list_records(self, limit: int = 50) -> list[StoredGame]:
+        """The most recently played games first."""
         with self._db() as db:
             rows = db.execute(
-                "SELECT id, mode, version, winner, created_at, updated_at FROM games"
-                " ORDER BY updated_at DESC LIMIT ?",
+                f"SELECT {StoredGame.COLUMNS} FROM games ORDER BY updated_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
 
-        columns = ["id", "mode", "version", "winner", "created_at", "updated_at"]
-        return [dict(zip(columns, row)) for row in rows]
+        return [StoredGame.from_row(row) for row in rows]
 
     @contextmanager
     def _db(self):
