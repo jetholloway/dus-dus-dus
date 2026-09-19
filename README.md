@@ -28,10 +28,11 @@ actions**:
 Two kinds of stall are forbidden. Any action by either player that would
 create one is illegal:
 
-- **No wall stall.** Each end zone must keep an empty square that an opposing
-  piece could reach by moving orthogonally through empty squares. Pieces
-  touching only at their corners still form a wall, because nothing moves
-  diagonally.
+- **No wall stall.** A defender must leave a gap through which the opponent
+  can bring new pieces into the defender's end zone. Only the defender's own
+  pieces form a wall: the opponent's pieces never block the opponent, and one
+  already in the end zone doesn't count as a way in. Pieces touching only at
+  their corners still form a wall, because nothing moves diagonally.
 - **No ball stall.** The player without the ball must be able to get a piece
   onto a square sharing an edge with the ball, or already have one there, so a
   tackle stays possible.

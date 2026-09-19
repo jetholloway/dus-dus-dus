@@ -104,19 +104,29 @@ impl Board {
         self.ball = position;
     }
 
-    /// No wall stall: the attacker must still be able to move a piece into an
-    /// empty square of the defender's end zone.
+    /// No wall stall: the defender must leave a gap through which the attacker
+    /// can still bring new pieces into the defender's end zone.
+    ///
+    /// Only the defender's pieces form a wall; the attacker's own pieces never
+    /// block the attacker, since they can move out of the way. An attacker
+    /// piece already in the end zone is not a new piece, so it doesn't count
+    /// as a way in.
     fn wall_stall(&self, defender: Player) -> bool {
         let end_zone = match defender {
             Player::First => 0,
             Player::Second => 6,
         };
+        let attacker = defender.other();
 
-        let empty_end_zone = (0..7)
+        let open_end_zone = (0..7)
             .map(|x| Position { x, y: end_zone })
-            .filter(|position| self.space(*position) == Space::Empty);
+            .filter(|position| self.space(*position) != Space::Piece(defender));
 
-        !self.empty_region_borders(empty_end_zone, defender.other())
+        !self.reaches(
+            open_end_zone,
+            |space| space != Space::Piece(defender),
+            |position, space| space == Space::Piece(attacker) && position.y != end_zone,
+        )
     }
 
     /// No ball stall: the player without the ball must be able to get a piece
@@ -138,13 +148,23 @@ impl Board {
 
         let empty_edges = edges.filter(|position| self.space(*position) == Space::Empty);
 
-        !self.empty_region_borders(empty_edges, challenger)
+        !self.reaches(
+            empty_edges,
+            |space| space == Space::Empty,
+            |_, space| space == Space::Piece(challenger),
+        )
     }
 
-    /// Whether the empty squares orthogonally connected to `starts` border any
-    /// of `player`'s pieces. Pieces only move orthogonally, so a gap that is
-    /// only diagonal is not a way through.
-    fn empty_region_borders(&self, starts: impl Iterator<Item = Position>, player: Player) -> bool {
+    /// Flood fills orthogonally from `starts` through squares that are
+    /// `passable`, and reports whether it reaches a square that is a `goal`.
+    /// Pieces only move orthogonally, so a gap that is only diagonal is not a
+    /// way through.
+    fn reaches(
+        &self,
+        starts: impl Iterator<Item = Position>,
+        passable: impl Fn(Space) -> bool,
+        goal: impl Fn(Position, Space) -> bool,
+    ) -> bool {
         let mut visited = [[false; 7]; 7];
         let mut stack = [Position { x: 0, y: 0 }; 49];
         let mut len = 0;
@@ -160,14 +180,20 @@ impl Board {
             let position = stack[len];
 
             for neighbour in position.orthogonal_neighbours() {
-                match self.space(neighbour) {
-                    Space::Piece(owner) if owner == player => return true,
-                    Space::Empty if !visited[neighbour.x as usize][neighbour.y as usize] => {
-                        visited[neighbour.x as usize][neighbour.y as usize] = true;
-                        stack[len] = neighbour;
-                        len += 1;
-                    }
-                    _ => {}
+                let space = self.space(neighbour);
+
+                if space == Space::Invalid || visited[neighbour.x as usize][neighbour.y as usize] {
+                    continue;
+                }
+
+                if goal(neighbour, space) {
+                    return true;
+                }
+
+                if passable(space) {
+                    visited[neighbour.x as usize][neighbour.y as usize] = true;
+                    stack[len] = neighbour;
+                    len += 1;
                 }
             }
         }
@@ -287,6 +313,44 @@ mod tests {
         ]);
 
         assert!(!board.wall_stall(Player::First));
+    }
+
+    #[test]
+    fn an_attacker_already_in_the_end_zone_is_not_a_way_in() {
+        // From a real game: Teal's wall A7-B6-C7-D6-E5-F6-G7 is complete.
+        // Orange's piece on E7 touches the empty D7 and F7, but it is already
+        // in the end zone, so no new Orange piece can get there.
+        let board = board([
+            "X.X.O.X", //
+            ".X.X.X.", //
+            "....X.O", //
+            ".......", //
+            ".O.....", //
+            ".......", //
+            "o..OOO.", //
+        ]);
+
+        assert!(board.wall_stall(Player::Second));
+        assert_eq!(board.stall(), Some("Wall stall"));
+    }
+
+    #[test]
+    fn an_attacker_filling_the_only_gap_is_not_a_wall_stall() {
+        // From a real game: Orange has just moved onto B7, the only square in
+        // Teal's end zone it could reach; E7 and G7 are walled off by Teal.
+        // Orange's own piece in the gap doesn't close it.
+        let board = board([
+            "XOXX.X.", //
+            "....X.X", //
+            "....o..", //
+            "..X....", //
+            ".......", //
+            ".......", //
+            "OO..OOO", //
+        ]);
+
+        assert!(!board.wall_stall(Player::Second));
+        assert_eq!(board.stall(), None);
     }
 
     #[test]
