@@ -29,6 +29,19 @@ impl Position {
         NeighbourIterator::new(self)
     }
 
+    pub fn orthogonal_neighbours(self) -> impl Iterator<Item = Position> + Clone {
+        const DISPLACEMENTS: [Displacement; 4] = [
+            Displacement { x: 1, y: 0 },
+            Displacement { x: 0, y: 1 },
+            Displacement { x: -1, y: 0 },
+            Displacement { x: 0, y: -1 },
+        ];
+
+        DISPLACEMENTS
+            .into_iter()
+            .map(move |displacement| self + displacement)
+    }
+
     pub fn taxicab_distance(self, other: Self) -> i8 {
         (self - other).taxicab_distance()
     }

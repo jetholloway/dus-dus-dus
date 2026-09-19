@@ -1,6 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashSet};
 use std::fmt::{Display, Formatter};
 
 use super::*;
@@ -16,12 +14,6 @@ pub enum Space {
     Invalid,
     Empty,
     Piece(Player),
-}
-
-#[derive(Eq, PartialEq)]
-struct ClosestPositionToRank {
-    position: Position,
-    y: i8,
 }
 
 impl Board {
@@ -64,8 +56,18 @@ impl Board {
         println!("  A  B  C  D  E  F  G")
     }
 
-    pub(crate) fn ball_trapped(&self) -> bool {
-        !self.path_to_rank(self.ball, 0) || !self.path_to_rank(self.ball, 6)
+    /// The stall this board is in, if any. The rulebook forbids both kinds at
+    /// all times after setup.
+    pub(crate) fn stall(&self) -> Option<&'static str> {
+        if self.ball_stall() {
+            return Some("Ball stall");
+        }
+
+        if self.wall_stall(Player::First) || self.wall_stall(Player::Second) {
+            return Some("Wall stall");
+        }
+
+        None
     }
 
     pub(crate) fn has_winner(&self, player: Player) -> bool {
@@ -102,32 +104,71 @@ impl Board {
         self.ball = position;
     }
 
-    fn path_to_rank(&self, from: Position, y: i8) -> bool {
-        let mut closed_spaces = HashSet::new();
-        let mut open_spaces = BinaryHeap::new();
+    /// No wall stall: the attacker must still be able to move a piece into an
+    /// empty square of the defender's end zone.
+    fn wall_stall(&self, defender: Player) -> bool {
+        let end_zone = match defender {
+            Player::First => 0,
+            Player::Second => 6,
+        };
 
-        open_spaces.push(ClosestPositionToRank { position: from, y });
+        let empty_end_zone = (0..7)
+            .map(|x| Position { x, y: end_zone })
+            .filter(|position| self.space(*position) == Space::Empty);
 
-        while let Some(next) = open_spaces.pop() {
-            if next.position.y == y {
-                return true;
-            }
+        !self.empty_region_borders(empty_end_zone, defender.other())
+    }
 
-            closed_spaces.insert(next.position);
+    /// No ball stall: the player without the ball must be able to get a piece
+    /// onto a square sharing an edge with the ball, so a tackle stays possible.
+    fn ball_stall(&self) -> bool {
+        let Space::Piece(holder) = self.space(self.ball) else {
+            return false;
+        };
+        let challenger = holder.other();
 
-            for neighbour in next.position.neighbours() {
-                if self.space(neighbour) != Space::Empty {
-                    continue;
+        let edges = self.ball.orthogonal_neighbours();
+
+        if edges
+            .clone()
+            .any(|position| self.space(position) == Space::Piece(challenger))
+        {
+            return false;
+        }
+
+        let empty_edges = edges.filter(|position| self.space(*position) == Space::Empty);
+
+        !self.empty_region_borders(empty_edges, challenger)
+    }
+
+    /// Whether the empty squares orthogonally connected to `starts` border any
+    /// of `player`'s pieces. Pieces only move orthogonally, so a gap that is
+    /// only diagonal is not a way through.
+    fn empty_region_borders(&self, starts: impl Iterator<Item = Position>, player: Player) -> bool {
+        let mut visited = [[false; 7]; 7];
+        let mut stack = [Position { x: 0, y: 0 }; 49];
+        let mut len = 0;
+
+        for start in starts {
+            visited[start.x as usize][start.y as usize] = true;
+            stack[len] = start;
+            len += 1;
+        }
+
+        while len > 0 {
+            len -= 1;
+            let position = stack[len];
+
+            for neighbour in position.orthogonal_neighbours() {
+                match self.space(neighbour) {
+                    Space::Piece(owner) if owner == player => return true,
+                    Space::Empty if !visited[neighbour.x as usize][neighbour.y as usize] => {
+                        visited[neighbour.x as usize][neighbour.y as usize] = true;
+                        stack[len] = neighbour;
+                        len += 1;
+                    }
+                    _ => {}
                 }
-
-                if closed_spaces.contains(&neighbour) {
-                    continue;
-                }
-
-                open_spaces.push(ClosestPositionToRank {
-                    position: neighbour,
-                    y,
-                })
             }
         }
 
@@ -151,20 +192,147 @@ impl Display for Space {
     }
 }
 
-impl PartialOrd<Self> for ClosestPositionToRank {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl Ord for ClosestPositionToRank {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.y.cmp(&other.y).then(
-            (other.position.y - self.y)
-                .abs()
-                .cmp(&(self.position.y - self.y).abs())
-                .then(self.position.y.cmp(&other.position.y))
-                .then(self.position.x.cmp(&other.position.x)),
-        )
+    /// Builds a board from rows written top to bottom, rank 7 first. `O` and
+    /// `X` are pieces, `.` is empty, and a lowercase `o` or `x` is the piece
+    /// holding the ball.
+    fn board(rows: [&str; 7]) -> Board {
+        let mut board = Board::new();
+
+        for (row, line) in rows.iter().enumerate() {
+            let y = 6 - row as i8;
+
+            for (x, char) in line.chars().enumerate() {
+                let position = Position { x: x as i8, y };
+                let space = match char.to_ascii_uppercase() {
+                    'O' => Space::Piece(Player::First),
+                    'X' => Space::Piece(Player::Second),
+                    '.' => Space::Empty,
+                    other => panic!("unexpected square {other:?}"),
+                };
+
+                board.set_space(position, space);
+
+                if char.is_ascii_lowercase() {
+                    board.set_ball(position);
+                }
+            }
+        }
+
+        board
+    }
+
+    #[test]
+    fn position_after_setup_has_no_stall() {
+        let board = board([
+            "XXX.XXX", //
+            ".......", //
+            "...X...", //
+            ".......", //
+            "...o...", //
+            ".......", //
+            "OOO.OOO", //
+        ]);
+
+        assert_eq!(board.stall(), None);
+    }
+
+    #[test]
+    fn a_full_end_zone_is_a_wall_stall() {
+        let board = board([
+            "XXX.XXX", //
+            ".......", //
+            "...X...", //
+            ".......", //
+            "...o...", //
+            ".......", //
+            "OOOOOOO", //
+        ]);
+
+        assert!(board.wall_stall(Player::First));
+        assert_eq!(board.stall(), Some("Wall stall"));
+    }
+
+    #[test]
+    fn a_diagonal_wall_is_a_wall_stall() {
+        // The rulebook's "No Wall Stall" counter-example: pieces touching only
+        // at their corners still block, because nothing moves diagonally.
+        let board = board([
+            "xXX.XXX", //
+            ".......", //
+            ".......", //
+            "O.O.O.O", //
+            ".O.O.O.", //
+            ".......", //
+            ".......", //
+        ]);
+
+        assert!(board.wall_stall(Player::First));
+        assert!(!board.wall_stall(Player::Second));
+    }
+
+    #[test]
+    fn a_wall_with_a_gap_is_not_a_wall_stall() {
+        let board = board([
+            "xXX.XXX", //
+            ".......", //
+            ".......", //
+            "O.O.O.O", //
+            ".O.O...", //
+            ".......", //
+            ".......", //
+        ]);
+
+        assert!(!board.wall_stall(Player::First));
+    }
+
+    #[test]
+    fn surrounding_the_ball_on_every_edge_is_a_ball_stall() {
+        // Empty diagonals do not help: a tackle needs a shared edge.
+        let board = board([
+            "XXX.XXX", //
+            ".......", //
+            "...O...", //
+            "..OoO..", //
+            "...O...", //
+            ".......", //
+            "OOO.OOO", //
+        ]);
+
+        assert!(board.ball_stall());
+        assert_eq!(board.stall(), Some("Ball stall"));
+    }
+
+    #[test]
+    fn an_opponent_already_on_an_edge_is_not_a_ball_stall() {
+        let board = board([
+            "XXX.XXX", //
+            ".......", //
+            "...O...", //
+            "..OoX..", //
+            "...O...", //
+            ".......", //
+            "OOO.OOO", //
+        ]);
+
+        assert!(!board.ball_stall());
+    }
+
+    #[test]
+    fn an_open_edge_the_opponent_can_reach_is_not_a_ball_stall() {
+        let board = board([
+            "XXX.XXX", //
+            ".......", //
+            ".......", //
+            "..OoO..", //
+            "...O...", //
+            ".......", //
+            "OOO.OOO", //
+        ]);
+
+        assert!(!board.ball_stall());
     }
 }

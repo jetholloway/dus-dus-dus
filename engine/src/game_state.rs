@@ -49,8 +49,10 @@ impl GameState {
         let mut board = self.board.clone();
         update_board(&mut board);
 
-        if !self.setup() && board.ball_trapped() {
-            return ActionResult::Invalid("Ball trapped");
+        if !self.setup() {
+            if let Some(stall) = board.stall() {
+                return ActionResult::Invalid(stall);
+            }
         }
 
         let state = Self {
@@ -171,7 +173,7 @@ impl Display for Turn {
 }
 
 impl Player {
-    fn other(&self) -> Self {
+    pub(crate) fn other(&self) -> Self {
         match self {
             Player::First => Player::Second,
             Player::Second => Player::First,

@@ -20,12 +20,23 @@ actions**:
 - **PASS** from the ball carrier to another of your pieces, in a straight line
   orthogonally or diagonally. Your own pieces do not block the lane; an
   opponent's piece does.
-- **TACKLE** with a piece standing orthogonally adjacent to the ball: it steps
-  onto an adjacent empty square and takes the ball with it. Illegal if your own
-  side already holds the ball, or if it would land on a scoring rank.
+- **TACKLE** with a piece sharing an edge (not just a corner) with the
+  opponent's piece that holds the ball. The tackler takes the ball and must
+  then move one square in any direction, diagonals included, onto an empty
+  square. It may not finish in the opponent's end zone.
 
-After every action the ball must still be able to reach both rank 1 and rank 7
-across empty squares, so neither player can wall it in.
+Two kinds of stall are forbidden. Any action by either player that would
+create one is illegal:
+
+- **No wall stall.** Each end zone must keep an empty square that an opposing
+  piece could reach by moving orthogonally through empty squares. Pieces
+  touching only at their corners still form a wall, because nothing moves
+  diagonally.
+- **No ball stall.** The player without the ball must be able to get a piece
+  onto a square sharing an edge with the ball, or already have one there, so a
+  tackle stays possible.
+
+Neither applies during setup, while the back ranks are still full.
 
 You win when the ball ends up on your opponent's back rank on one of your
 pieces. Since the carrier cannot move and a tackle cannot land on a scoring
