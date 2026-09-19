@@ -229,3 +229,8 @@ def test_the_browser_client_is_served(client):
 
     assert response.status_code == 200
     assert "Dus Dus Dus" in response.text
+
+
+def test_the_browser_must_check_for_new_versions_of_the_client(client):
+    for path in ("/", "/app.js", "/replay.js", "/style.css"):
+        assert client.get(path).headers["cache-control"] == "no-cache", path

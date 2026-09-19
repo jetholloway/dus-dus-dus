@@ -27,6 +27,19 @@ from .storage import GameStore, StoredGame, default_db_path
 STATIC = Path(__file__).parent / "static"
 
 
+class RevalidatingStaticFiles(StaticFiles):
+    """Static files the browser must check for changes on every load.
+
+    Without this, a browser may keep running an old copy of the JavaScript
+    after it changes. The check is cheap: an unchanged file gets a 304.
+    """
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 class NewGame(BaseModel):
     mode: Mode = Mode.HOTSEAT
 
@@ -95,7 +108,7 @@ def create_app(db_path: Path | None = None, rng: random.Random | None = None) ->
         return game
 
     # Mounted last so the API routes above take precedence.
-    app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")
+    app.mount("/", RevalidatingStaticFiles(directory=STATIC, html=True), name="static")
     return app
 
 
