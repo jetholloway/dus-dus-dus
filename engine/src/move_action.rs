@@ -4,21 +4,21 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MoveAction {
-    from: Position,
-    to: Position,
+    src: Position,
+    dst: Position,
 }
 
 impl MoveAction {
-    pub(crate) fn new(from: Position, to: Position) -> Self {
-        Self { from, to }
+    pub(crate) fn new(src: Position, dst: Position) -> Self {
+        Self { src, dst }
     }
 
-    pub fn from(&self) -> Position {
-        self.from
+    pub fn src(&self) -> Position {
+        self.src
     }
 
-    pub fn to(&self) -> Position {
-        self.to
+    pub fn dst(&self) -> Position {
+        self.dst
     }
 
     pub(crate) fn try_apply(&self, state: &GameState) -> ActionResult {
@@ -51,29 +51,29 @@ impl MoveAction {
         }
 
         state.try_apply(|board| {
-            board.set_space(self.from, Space::Empty);
-            board.set_space(self.to, Space::Piece(state.current_player()));
+            board.set_space(self.src, Space::Empty);
+            board.set_space(self.dst, Space::Piece(state.current_player()));
 
             if state.setup() && state.current_player() == Player::First {
-                board.set_ball(self.to);
+                board.set_ball(self.dst);
             }
         })
     }
 
     fn not_current_players_piece(&self, state: &GameState) -> bool {
-        state.space(self.from) != Space::Piece(state.current_player())
+        state.space(self.src) != Space::Piece(state.current_player())
     }
 
     fn acting_piece_has_ball(&self, state: &GameState) -> bool {
-        self.from == state.ball()
+        self.src == state.ball()
     }
 
     fn target_space_occupied(&self, state: &GameState) -> bool {
-        state.space(self.to) != Space::Empty
+        state.space(self.dst) != Space::Empty
     }
 
     fn try_get_orthogonal_path(&self) -> Option<Path> {
-        self.from.try_get_orthogonal_path(self.to)
+        self.src.try_get_orthogonal_path(self.dst)
     }
 
     fn path_too_log(&self, path: &Path) -> bool {
@@ -97,6 +97,6 @@ impl MoveAction {
 
 impl Display for MoveAction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MOVE {} {}", self.from, self.to)
+        write!(f, "MOVE {} {}", self.src, self.dst)
     }
 }

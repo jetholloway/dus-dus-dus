@@ -26,24 +26,24 @@ pub enum ActionType {
 }
 
 impl Action {
-    pub fn new(action_type: ActionType, from: Position, to: Position) -> Self {
+    pub fn new(action_type: ActionType, src: Position, dst: Position) -> Self {
         match action_type {
-            ActionType::Move => Self::new_move(from, to),
-            ActionType::Tackle => Self::new_tackle(from, to),
-            ActionType::Pass => Self::new_pass(from, to),
+            ActionType::Move => Self::new_move(src, dst),
+            ActionType::Tackle => Self::new_tackle(src, dst),
+            ActionType::Pass => Self::new_pass(src, dst),
         }
     }
 
-    pub fn new_move(from: Position, to: Position) -> Self {
-        Self::Move(MoveAction::new(from, to))
+    pub fn new_move(src: Position, dst: Position) -> Self {
+        Self::Move(MoveAction::new(src, dst))
     }
 
-    pub fn new_tackle(from: Position, to: Position) -> Self {
-        Self::Tackle(TackleAction::new(from, to))
+    pub fn new_tackle(src: Position, dst: Position) -> Self {
+        Self::Tackle(TackleAction::new(src, dst))
     }
 
-    pub fn new_pass(from: Position, to: Position) -> Self {
-        Self::Pass(PassAction::new(from, to))
+    pub fn new_pass(src: Position, dst: Position) -> Self {
+        Self::Pass(PassAction::new(src, dst))
     }
 
     pub fn action_type(&self) -> ActionType {
@@ -54,19 +54,19 @@ impl Action {
         }
     }
 
-    pub fn from(&self) -> Position {
+    pub fn src(&self) -> Position {
         match self {
-            Action::Move(action) => action.from(),
-            Action::Tackle(action) => action.from(),
-            Action::Pass(action) => action.from(),
+            Action::Move(action) => action.src(),
+            Action::Tackle(action) => action.src(),
+            Action::Pass(action) => action.src(),
         }
     }
 
-    pub fn to(&self) -> Position {
+    pub fn dst(&self) -> Position {
         match self {
-            Action::Move(action) => action.to(),
-            Action::Tackle(action) => action.to(),
-            Action::Pass(action) => action.to(),
+            Action::Move(action) => action.dst(),
+            Action::Tackle(action) => action.dst(),
+            Action::Pass(action) => action.dst(),
         }
     }
 
@@ -114,15 +114,17 @@ impl FromStr for Action {
             .ok_or("Action missing type".to_string())?;
         let action_type = ActionType::from_str(action_type)?;
 
-        let from = split_iterator
+        let src = split_iterator
             .next()
-            .ok_or("Action missing from position".to_string())?;
-        let from = Position::from_str(from)
-            .map_err(|error| format!("Invalid action from position: {error}"))?;
+            .ok_or("Action missing source position".to_string())?;
+        let src = Position::from_str(src)
+            .map_err(|error| format!("Invalid action source position: {error}"))?;
 
-        let to = split_iterator.next().ok_or("Action missing to position")?;
-        let to = Position::from_str(to)
-            .map_err(|error| format!("Invalid action from position: {error}"))?;
+        let dst = split_iterator
+            .next()
+            .ok_or("Action missing destination position")?;
+        let dst = Position::from_str(dst)
+            .map_err(|error| format!("Invalid action destination position: {error}"))?;
 
         if let Some(remainder) = split_iterator
             .map(|s| s.to_string())
@@ -131,7 +133,7 @@ impl FromStr for Action {
             return Err(format!("Trailing action input: {remainder}"));
         }
 
-        Ok(Action::new(action_type, from, to))
+        Ok(Action::new(action_type, src, dst))
     }
 }
 

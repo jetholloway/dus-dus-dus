@@ -4,21 +4,21 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TackleAction {
-    from: Position,
-    to: Position,
+    src: Position,
+    dst: Position,
 }
 
 impl TackleAction {
-    pub(crate) fn new(from: Position, to: Position) -> Self {
-        Self { from, to }
+    pub(crate) fn new(src: Position, dst: Position) -> Self {
+        Self { src, dst }
     }
 
-    pub fn from(&self) -> Position {
-        self.from
+    pub fn src(&self) -> Position {
+        self.src
     }
 
-    pub fn to(&self) -> Position {
-        self.to
+    pub fn dst(&self) -> Position {
+        self.dst
     }
 
     pub(crate) fn try_apply(&self, state: &GameState) -> ActionResult {
@@ -51,35 +51,35 @@ impl TackleAction {
         }
 
         state.try_apply(|board| {
-            board.set_space(self.from, Space::Empty);
-            board.set_space(self.to, Space::Piece(state.current_player()));
-            board.set_ball(self.to);
+            board.set_space(self.src, Space::Empty);
+            board.set_space(self.dst, Space::Piece(state.current_player()));
+            board.set_ball(self.dst);
         })
     }
 
     fn not_current_players_piece(&self, state: &GameState) -> bool {
-        state.space(self.from) != Space::Piece(state.current_player())
+        state.space(self.src) != Space::Piece(state.current_player())
     }
 
     fn acting_piece_has_ball(&self, state: &GameState) -> bool {
-        self.from == state.ball()
+        self.src == state.ball()
     }
 
     fn target_space_is_occupied(&self, state: &GameState) -> bool {
-        state.space(self.to) != Space::Empty
+        state.space(self.dst) != Space::Empty
     }
 
     fn target_space_too_far(&self) -> bool {
-        self.from.chebyshev_distance(self.to) > 1
+        self.src.chebyshev_distance(self.dst) > 1
     }
 
     fn target_space_winning_rank(&self, state: &GameState) -> bool {
-        state.current_player() == Player::First && self.to.y == 6
-            || state.current_player() == Player::Second && self.to.y == 0
+        state.current_player() == Player::First && self.dst.y == 6
+            || state.current_player() == Player::Second && self.dst.y == 0
     }
 
     fn ball_not_adjacent(&self, state: &GameState) -> bool {
-        self.from.taxicab_distance(state.ball()) != 1
+        self.src.taxicab_distance(state.ball()) != 1
     }
 
     fn current_player_has_ball(&self, state: &GameState) -> bool {
@@ -89,6 +89,6 @@ impl TackleAction {
 
 impl Display for TackleAction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "TACKLE {} {}", self.from, self.to)
+        write!(f, "TACKLE {} {}", self.src, self.dst)
     }
 }

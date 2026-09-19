@@ -24,25 +24,25 @@ impl GameState {
         let ball = self.ball();
         let mut candidates = Vec::new();
 
-        for from in Self::positions() {
-            if self.space(from) != Space::Piece(player) {
+        for src in Self::positions() {
+            if self.space(src) != Space::Piece(player) {
                 continue;
             }
 
             for displacement in MOVE_DISPLACEMENTS {
-                candidates.push(Action::new_move(from, from + displacement));
+                candidates.push(Action::new_move(src, src + displacement));
             }
 
-            if from.taxicab_distance(ball) == 1 {
-                for to in from.neighbours() {
-                    candidates.push(Action::new_tackle(from, to));
+            if src.taxicab_distance(ball) == 1 {
+                for dst in src.neighbours() {
+                    candidates.push(Action::new_tackle(src, dst));
                 }
             }
 
-            if from == ball {
-                for to in Self::positions() {
-                    if to != from && self.space(to) == Space::Piece(player) {
-                        candidates.push(Action::new_pass(from, to));
+            if src == ball {
+                for dst in Self::positions() {
+                    if dst != src && self.space(dst) == Space::Piece(player) {
+                        candidates.push(Action::new_pass(src, dst));
                     }
                 }
             }
@@ -71,9 +71,9 @@ mod tests {
         let mut actions = Vec::new();
 
         for action_type in [ActionType::Move, ActionType::Tackle, ActionType::Pass] {
-            for from in GameState::positions() {
-                for to in GameState::positions() {
-                    actions.push(Action::new(action_type, from, to));
+            for src in GameState::positions() {
+                for dst in GameState::positions() {
+                    actions.push(Action::new(action_type, src, dst));
                 }
             }
         }
