@@ -4,6 +4,9 @@ A board game engine in Rust, with Python bindings and a web UI planned.
 
 ## The game
 
+The official rules are in [the rulebook](docs/DusDusDusv2booklet.pdf); this is
+a summary.
+
 Two players on a 7x7 board, files A to G and ranks 1 to 7. Player `O` starts
 with seven pieces on rank 1, player `X` with seven on rank 7. There is one
 ball. No piece is ever captured.
