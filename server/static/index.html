@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dus Dus Dus</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Dus Dus Dus</h1>
+      <nav>
+        <button id="new-bot" type="button">New game vs bot</button>
+        <button id="new-hotseat" type="button">New hot-seat game</button>
+      </nav>
+    </header>
+
+    <p id="status" role="status">Start a game to play.</p>
+
+    <div id="board" class="board" aria-label="Board"></div>
+
+    <p id="message" class="message" role="alert"></p>
+
+    <details class="help">
+      <summary>How to play</summary>
+      <ul>
+        <li>Click one of your pieces to see what it can do.</li>
+        <li><strong>Move:</strong> click a highlighted empty square.</li>
+        <li><strong>Pass:</strong> with the ball carrier selected, click a highlighted team-mate.</li>
+        <li><strong>Tackle:</strong> select a piece next to the ball, click the ball, then click where to go.</li>
+        <li>Click the selected piece again, or press Escape, to cancel.</li>
+      </ul>
+      <p>The full rules are in the rulebook in the project's <code>docs</code> folder.</p>
+    </details>
+
+    <section class="log">
+      <h2>Moves</h2>
+      <ol id="log"></ol>
+    </section>
+  </main>
+</body>
+</html>

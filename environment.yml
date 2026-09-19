@@ -8,3 +8,6 @@ dependencies:
   - pip  # maturin develop installs the extension with pip
   - maturin
   - pytest
+  - fastapi
+  - uvicorn
+  - httpx  # FastAPI's test client

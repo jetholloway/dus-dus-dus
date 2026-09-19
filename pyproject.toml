@@ -16,3 +16,4 @@ module-name = "dus_engine"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # so the tests can import the server package

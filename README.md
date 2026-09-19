@@ -86,6 +86,20 @@ just trial         # play random games and report win counts
 Re-run `just develop` after changing any Rust in `engine/` or `bindings/`;
 Python only sees the engine as of the last build.
 
+## Playing in the browser
+
+```bash
+just serve
+```
+
+then open <http://127.0.0.1:8000>. Play against a random bot, or hot-seat
+with two people on one browser. A game's address includes its id, so
+reloading the page or bookmarking it returns to the same game.
+
+Games are saved in SQLite at `~/.local/share/dus-dus-dus/games.sqlite`, or
+wherever `DUS_DB` points. It is kept out of the project directory on purpose:
+a file-syncing service copying a live database mid-write can corrupt it.
+
 The environment is called `dus-dus-dus` and micromamba keeps it outside the
 project directory, so nothing large lands in the repository. The recipes reach
 into it with `micromamba run`, so they work whether or not it is activated.
@@ -106,7 +120,8 @@ roughly sixteen times slower.
 | `engine/` | The game: board, positions, rules, legal action enumeration, game records. No dependencies beyond serde. |
 | `dus-dus-dus/` | Command line binary. Console and random players, and the game loop. |
 | `bindings/` | The `dus_engine` Python module, built with maturin. Outside the Cargo workspace so Rust builds never need Python. |
-| `tests/` | Python tests for the bindings. |
+| `server/` | The web server: a FastAPI JSON API over the engine, SQLite storage, and the browser client in `server/static/`. |
+| `tests/` | Python tests for the bindings and the server. |
 | `game/` | An unused sketch of a game-agnostic framework with a Monte Carlo tree search. Nothing depends on it. |
 | `scratch/` | A throwaway playground. |
 
@@ -123,7 +138,6 @@ state = state.apply(Action("MOVE A1 A3"))
 state.winner                          # None until someone scores
 ```
 
-There is no UI yet: `main()` runs a batch of random games, and the console
-player exists but nothing currently reaches it.
+The browser UI plays full games against a random bot or hot-seat.
 
-Planned next are a web UI with a Python server, then multiplayer.
+Planned next are a game list and replay viewer, then multiplayer.

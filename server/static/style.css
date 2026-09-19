@@ -1,0 +1,181 @@
+:root {
+  --square: min(11vmin, 64px);
+  --board: #f4f1ea;
+  --grid: #2b2b2b;
+  --first: #f0a032;
+  --second: #1f6f78;
+  --ball: #2fbf3f;
+  --highlight: #f06bdc;
+  --text: #222;
+  font-family: system-ui, sans-serif;
+  color: var(--text);
+}
+
+body {
+  margin: 0;
+  background: #fbfaf7;
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  letter-spacing: 0.05em;
+}
+
+nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+nav button {
+  padding: 0.4rem 0.8rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+#status {
+  min-height: 1.5em;
+  font-weight: 600;
+}
+
+.message {
+  min-height: 1.5em;
+  color: #555;
+}
+
+.message.error {
+  color: #b00020;
+}
+
+/* The board: a label column plus seven files, seven ranks plus a label row. */
+.board {
+  display: grid;
+  grid-template-columns: 1.5rem repeat(7, var(--square));
+  grid-auto-rows: var(--square);
+  width: max-content;
+}
+
+.label {
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.board .label.file {
+  height: 1.5rem;
+}
+
+.square {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--grid);
+  margin: 0 -1px -1px 0;
+  background: var(--board);
+  cursor: default;
+}
+
+.square.movable,
+.square.selected,
+.square.move-target,
+.square.pass-target,
+.square.tackle-target,
+.square.tackle-dst {
+  cursor: pointer;
+}
+
+.square.movable:hover {
+  background: #ece6d8;
+}
+
+.square.selected {
+  outline: 3px solid var(--text);
+  outline-offset: -4px;
+  z-index: 1;
+}
+
+.square.move-target,
+.square.tackle-dst {
+  background: var(--highlight);
+}
+
+.square.pass-target,
+.square.tackle-target {
+  box-shadow: inset 0 0 0 4px var(--highlight);
+}
+
+.square.last {
+  background-image: linear-gradient(rgba(0, 0, 0, 0.07), rgba(0, 0, 0, 0.07));
+}
+
+/* Pieces: a rounded square with a disc in the middle, as in the rulebook. */
+.piece {
+  display: grid;
+  place-items: center;
+  width: 72%;
+  height: 72%;
+  border: 2px solid #333;
+  border-radius: 18%;
+}
+
+.piece.first {
+  background: var(--first);
+}
+
+.piece.second {
+  background: var(--second);
+}
+
+.piece::after {
+  content: "";
+  width: 48%;
+  height: 48%;
+  border: 2px solid #333;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.piece.has-ball::after {
+  background: var(--ball);
+}
+
+.help,
+.log {
+  margin-top: 1.5rem;
+}
+
+.log h2 {
+  font-size: 1.1rem;
+}
+
+.log ol {
+  max-height: 14rem;
+  overflow-y: auto;
+  padding-left: 2.5rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.9rem;
+}
+
+.log .first {
+  color: #a8650a;
+}
+
+.log .second {
+  color: var(--second);
+}
