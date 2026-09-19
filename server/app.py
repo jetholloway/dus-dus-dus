@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .games import PLAYER_NAMES, Game, Mode, NotYourTurn
+from .games import PLAYER_NAMES, Game, Mode, NotYourTurn, UnreplayableGame
 from .storage import GameStore, default_db_path
 
 STATIC = Path(__file__).parent / "static"
@@ -66,7 +66,14 @@ def create_app(db_path: Path | None = None, rng: random.Random | None = None) ->
         return game_payload(game)
 
     def _load(game_id: str) -> Game:
-        game = store.load(game_id)
+        try:
+            game = store.load(game_id)
+        except UnreplayableGame as error:
+            raise HTTPException(
+                409,
+                "This game was recorded under older rules and can't be replayed"
+                f" under the current ones. {error}.",
+            )
         if game is None:
             raise HTTPException(404, "No such game")
         return game

@@ -21,6 +21,14 @@ class NotYourTurn(Exception):
     pass
 
 
+class UnreplayableGame(Exception):
+    """A stored game whose moves the current rules no longer allow.
+
+    Games are rebuilt by replaying their moves, so a rule change can leave an
+    old game with a move that is now illegal.
+    """
+
+
 @dataclass
 class Game:
     id: str
@@ -35,7 +43,11 @@ class Game:
     @classmethod
     def from_record(cls, id: str, mode: Mode, record: GameRecord) -> "Game":
         """Rebuild a game by replaying its record, which also validates it."""
-        return cls(id=id, mode=mode, record=record, state=record.replay()[-1])
+        try:
+            states = record.replay()
+        except ValueError as error:
+            raise UnreplayableGame(str(error)) from error
+        return cls(id=id, mode=mode, record=record, state=states[-1])
 
     @property
     def version(self) -> int:

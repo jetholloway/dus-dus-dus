@@ -132,6 +132,24 @@ def test_games_survive_a_restart(db_path):
     assert restored == game
 
 
+def test_a_game_the_current_rules_forbid_is_reported_not_crashed_on(client, db_path):
+    from dus_engine import Action, GameRecord, GameState
+    from server.games import Game, Mode
+    from server.storage import GameStore
+
+    # As if saved under older rules: a one-square setup move is illegal now.
+    record = GameRecord(actions=[Action("MOVE A1 A2")])
+    GameStore(db_path).insert(Game("legacy", Mode.HOTSEAT, record, GameState()))
+
+    response = client.get("/api/games/legacy")
+
+    assert response.status_code == 409
+    assert "older rules" in response.json()["detail"]
+    assert "Path too short" in response.json()["detail"]
+    assert "legacy" in [summary["id"] for summary in client.get("/api/games").json()]
+    assert play(client, {"id": "legacy", "version": 1}, "MOVE D1 D3").status_code == 409
+
+
 def test_games_are_listed_most_recent_first(client):
     older = new_game(client)
     newer = new_game(client, mode="bot")
