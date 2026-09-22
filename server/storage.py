@@ -18,7 +18,7 @@ from dus_engine import GameRecord, Player
 from .games import PLAYER_NAMES, Game, Mode, Seat
 
 # Bumped whenever the tables change; _migrate brings older files up to it.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 GAMES_TABLE = """
 CREATE TABLE IF NOT EXISTS games (
@@ -33,8 +33,9 @@ CREATE TABLE IF NOT EXISTS games (
 """
 
 # Added in schema version 1. Games saved before it have no seats, which leaves
-# both sides open for anyone to play.
-SEAT_COLUMNS = ("first_player", "first_name", "second_player", "second_name")
+# both sides open for anyone to play. "invite", added in version 2, holds the
+# code that claims an online game's empty seat until someone does.
+SEAT_COLUMNS = ("first_player", "first_name", "second_player", "second_name", "invite")
 
 
 @dataclass
@@ -49,15 +50,19 @@ class StoredGame:
     created_at: str
     updated_at: str
     seats: dict[Player, Seat] = field(default_factory=dict)
+    invite: str | None = None
 
     @classmethod
     def from_row(cls, row) -> "StoredGame":
-        id, mode, record, created_at, updated_at, first, first_name, second, second_name = row
+        (id, mode, record, created_at, updated_at,
+         first, first_name, second, second_name, invite) = row
         seats = {
             Player.First: Seat(first, first_name),
             Player.Second: Seat(second, second_name),
         }
-        return cls(id, Mode(mode), GameRecord.from_json(record), created_at, updated_at, seats)
+        return cls(
+            id, Mode(mode), GameRecord.from_json(record), created_at, updated_at, seats, invite
+        )
 
 
 def default_db_path() -> Path:
@@ -84,7 +89,7 @@ class GameStore:
             db.execute(
                 "INSERT INTO games (id, mode, record, version, winner, created_at, updated_at,"
                 f" {', '.join(SEAT_COLUMNS)})"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (game.id, game.mode.value, game.record.to_json(), game.version,
                  _winner(game), now, now, *_seat_values(game)),
             )
@@ -112,7 +117,9 @@ class GameStore:
         stored = self.load_record(id)
         if stored is None:
             return None
-        return Game.from_record(stored.id, stored.mode, stored.record, stored.seats)
+        return Game.from_record(
+            stored.id, stored.mode, stored.record, stored.seats, stored.invite
+        )
 
     def load_record(self, id: str) -> StoredGame | None:
         """The game's stored moves, without replaying them."""
@@ -164,6 +171,7 @@ def _seat_values(game: Game) -> tuple:
         game.seat(Player.First).name,
         game.seat(Player.Second).owner,
         game.seat(Player.Second).name,
+        game.invite,
     )
 
 

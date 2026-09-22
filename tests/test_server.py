@@ -39,6 +39,14 @@ def play(client, game, action, headers=JET):
     )
 
 
+def join(client, game, name, headers):
+    return client.post(
+        f"/api/games/{game['id']}/join",
+        json={"invite": game["invite"], "name": name},
+        headers=headers,
+    )
+
+
 def store_record(db_path, id, record, mode=Mode.HOTSEAT, seats=None):
     """Save a record straight to the database, as an older server might have."""
     GameStore(db_path).insert(Game(id, mode, record, GameState(), seats or {}))
@@ -210,6 +218,100 @@ def test_an_older_database_gains_seats_without_losing_games(db_path):
     assert game["version"] == 1
     assert game["seats"]["First"]["name"] is None
     assert [summary["id"] for summary in client.get("/api/games").json()] == ["old"]
+
+
+def test_an_online_game_waits_for_someone_to_join(client):
+    game = new_game(client, mode="online", name="Jet")
+
+    mine, theirs = _taken_and_open(game)
+    assert game["seats"][mine] == {"name": "Jet", "is_bot": False, "is_you": True}
+    assert game["seats"][theirs] == {"name": None, "is_bot": False, "is_you": False}
+    assert game["invite"]
+    # Nobody may play the empty side, not even the player who is waiting.
+    assert game["can_play"] == [mine]
+
+    # The invitation is for the players, not for anyone who finds the game.
+    assert client.get(f"/api/games/{game['id']}", headers=SAM).json()["invite"] is None
+
+
+def test_the_sides_of_online_games_are_drawn_at_random(db_path):
+    client = TestClient(create_app(db_path, rng=random.Random(7)))
+
+    mine = {_taken_and_open(new_game(client, mode="online"))[0] for _ in range(20)}
+
+    assert mine == {"First", "Second"}
+
+
+def test_joining_takes_the_open_seat(client):
+    game = new_game(client, mode="online", name="Jet")
+    mine, theirs = _taken_and_open(game)
+
+    joined = join(client, game, name="Sam", headers=SAM)
+
+    assert joined.status_code == 200
+    joined = joined.json()
+    assert joined["seats"][theirs] == {"name": "Sam", "is_bot": False, "is_you": True}
+    assert joined["can_play"] == [theirs]
+    # The invitation is spent, and both sides are now somebody's.
+    assert joined["invite"] is None
+    assert client.get(f"/api/games/{game['id']}", headers=JET).json()["can_play"] == [mine]
+
+
+def test_a_wrong_invitation_is_refused(client):
+    game = new_game(client, mode="online")
+
+    refused = client.post(
+        f"/api/games/{game['id']}/join",
+        json={"invite": "not-the-code", "name": "Sam"},
+        headers=SAM,
+    )
+
+    assert refused.status_code == 403
+    assert client.get(f"/api/games/{game['id']}", headers=SAM).json()["can_play"] == []
+
+
+def test_a_third_player_cannot_take_a_taken_seat(client):
+    game = new_game(client, mode="online")
+    join(client, game, name="Sam", headers=SAM)
+
+    response = client.post(
+        f"/api/games/{game['id']}/join",
+        json={"invite": game["invite"], "name": "Nosy"},
+        headers={"X-Player": "player-nosy"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_reopening_an_invitation_is_harmless(client):
+    game = new_game(client, mode="online")
+    join(client, game, name="Sam", headers=SAM)
+
+    again = join(client, game, name="Sam", headers=SAM)
+
+    assert again.status_code == 200
+    assert len(again.json()["can_play"]) == 1
+
+
+def test_online_players_can_only_move_their_own_side(client):
+    game = new_game(client, mode="online", name="Jet")
+    game = join(client, game, name="Sam", headers=SAM).json()
+
+    first = JET if game["seats"]["First"]["name"] == "Jet" else SAM
+    second = SAM if first is JET else JET
+
+    assert play(client, game, "MOVE D1 D3", headers=second).status_code == 403
+    game = play(client, game, "MOVE D1 D3", headers=first).json()
+    assert play(client, game, "MOVE A7 A5", headers=first).status_code == 403
+    assert play(client, game, "MOVE A7 A5", headers=second).status_code == 200
+
+
+def _taken_and_open(game):
+    """The side the game's creator took, and the one still waiting."""
+    taken = [side for side, seat in game["seats"].items() if seat["is_you"]]
+    open_seats = [side for side, seat in game["seats"].items() if seat["name"] is None]
+    assert len(taken) == 1 and len(open_seats) == 1
+    return taken[0], open_seats[0]
 
 
 def test_games_survive_a_restart(db_path):

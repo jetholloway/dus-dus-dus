@@ -1,6 +1,7 @@
 """A game in progress: the engine state plus who plays each side."""
 
 import random
+import secrets
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -17,9 +18,18 @@ BOT_NAME = "Bot"
 class Mode(str, Enum):
     HOTSEAT = "hotseat"
     BOT = "bot"
+    ONLINE = "online"
 
 
 class NotYourTurn(Exception):
+    pass
+
+
+class BadInvite(Exception):
+    pass
+
+
+class SeatTaken(Exception):
     pass
 
 
@@ -104,21 +114,43 @@ class Game:
     record: GameRecord
     state: GameState
     seats: dict[Player, Seat] = field(default_factory=dict)
+    # The code that claims the empty seat of an online game, until someone does.
+    invite: str | None = None
 
     @classmethod
-    def new(cls, id: str, mode: Mode, player_id: str, player_name: str) -> "Game":
+    def new(
+        cls,
+        id: str,
+        mode: Mode,
+        player_id: str,
+        player_name: str,
+        rng: random.Random | None = None,
+    ) -> "Game":
         """A new game, with its seats given to whoever asked for it.
 
         In hot-seat both seats are theirs, since one browser plays both sides.
-        Against the bot they take Orange and the bot takes Teal.
+        Against the bot they take Orange and the bot takes Teal. Online they
+        take one side at random and the other waits for a friend to join.
         """
         player = Seat(player_id, player_name)
         seats = {Player.First: player, Player.Second: player}
+        invite = None
 
         if mode is Mode.BOT:
             seats[Player.Second] = Seat(BOT, BOT_NAME)
+        elif mode is Mode.ONLINE:
+            theirs = (rng or random.Random()).choice(list(PLAYER_NAMES))
+            seats[theirs] = Seat()
+            invite = secrets.token_urlsafe(8)
 
-        return cls(id=id, mode=mode, record=GameRecord(), state=GameState(), seats=seats)
+        return cls(
+            id=id,
+            mode=mode,
+            record=GameRecord(),
+            state=GameState(),
+            seats=seats,
+            invite=invite,
+        )
 
     @classmethod
     def from_record(
@@ -127,12 +159,20 @@ class Game:
         mode: Mode,
         record: GameRecord,
         seats: dict[Player, Seat] | None = None,
+        invite: str | None = None,
     ) -> "Game":
         """Rebuild a game by replaying its record, which also validates it."""
         states, failure = replay(record)
         if failure is not None:
             raise UnreplayableGame(str(failure))
-        return cls(id=id, mode=mode, record=record, state=states[-1], seats=seats or {})
+        return cls(
+            id=id,
+            mode=mode,
+            record=record,
+            state=states[-1],
+            seats=seats or {},
+            invite=invite,
+        )
 
     @property
     def version(self) -> int:
@@ -142,12 +182,44 @@ class Game:
         return self.seats.get(player, Seat())
 
     def playable_seats(self, player_id: str | None) -> list[Player]:
-        """The sides this player may move, which is what the UI acts on."""
+        """The sides this player may move, which is what the UI acts on.
+
+        A seat still waiting for an invitation to be accepted is nobody's to
+        play, unlike the open seats of a game saved before seats existed.
+        """
         return [
             player
             for player in PLAYER_NAMES
-            if not self.seat(player).is_bot and self.seat(player).playable_by(player_id)
+            if not self.seat(player).is_bot
+            and self.seat(player).playable_by(player_id)
+            and not (self.invite is not None and self.seat(player).owner is None)
         ]
+
+    def open_seat(self) -> Player | None:
+        """The side waiting for someone, if any."""
+        for player in PLAYER_NAMES:
+            if self.seat(player).owner is None:
+                return player
+        return None
+
+    def join(self, player_id: str, player_name: str, invite: str) -> None:
+        """Take the open seat of an online game.
+
+        Opening a used invite again is harmless for whoever already holds a
+        seat, so a friend can reload the link they were sent.
+        """
+        if any(seat.belongs_to(player_id) for seat in self.seats.values()):
+            return
+
+        if self.invite is None or not secrets.compare_digest(invite, self.invite):
+            raise BadInvite("That invitation is not valid for this game")
+
+        seat = self.open_seat()
+        if seat is None:
+            raise SeatTaken("Both sides of this game are taken")
+
+        self.seats[seat] = Seat(player_id, player_name)
+        self.invite = None
 
     def is_bot_turn(self) -> bool:
         return not self.state.is_terminal and self.seat(self.state.current_player).is_bot

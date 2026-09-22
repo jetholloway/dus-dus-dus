@@ -15,6 +15,7 @@
         <label for="player-name">You are</label>
         <input id="player-name" type="text" maxlength="40" placeholder="your name" size="12">
         <a href="#">Games</a>
+        <button id="new-online" type="button">New online game</button>
         <button id="new-bot" type="button">New game vs bot</button>
         <button id="new-hotseat" type="button">New hot-seat game</button>
       </nav>
@@ -34,6 +35,11 @@
 
     <section id="play-view" hidden>
       <p class="subtitle"><span id="play-mode"></span> <a id="play-replay">Watch the replay</a></p>
+      <p id="play-invite" class="invite" hidden>
+        Send this link to whoever you want to play:
+        <input id="play-invite-link" type="text" readonly>
+        <button id="play-invite-copy" type="button">Copy</button>
+      </p>
       <p id="play-status" class="status" role="status"></p>
       <div id="play-board" class="board" aria-label="Board"></div>
       <p id="play-message" class="message" role="alert"></p>

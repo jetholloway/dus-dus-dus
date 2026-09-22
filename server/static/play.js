@@ -31,6 +31,22 @@ export async function startGame(mode) {
   }
 }
 
+// Accepts an invitation, then opens the game to play.
+export async function joinGame(id, invite) {
+  try {
+    const joined = await api(`/games/${id}/join`, {
+      method: "POST",
+      body: JSON.stringify({ invite, name: playerName() }),
+    });
+    const side = Object.keys(joined.seats).find((seat) => joined.seats[seat].is_you);
+    greeting = side ? `You joined as ${NAMES[side]}.` : "";
+  } catch (error) {
+    greeting = error.message;
+  }
+
+  location.hash = `play/${id}`;
+}
+
 export async function showPlay(id) {
   game = null;
   clearSelection();
@@ -39,6 +55,7 @@ export async function showPlay(id) {
 
   const replayLink = element("play-replay");
   replayLink.href = `#replay/${id}`;
+  element("play-invite").hidden = true;
 
   try {
     game = await api(`/games/${id}`);
@@ -173,8 +190,35 @@ function opponentSummary(before) {
 
 function render() {
   renderStatus();
+  renderInvite();
   renderBoard();
   renderLog();
+}
+
+// The link that gives the empty seat of an online game to a friend.
+function renderInvite() {
+  const invite = element("play-invite");
+  invite.hidden = game === null || !game.invite;
+
+  if (!invite.hidden) {
+    const { origin, pathname } = location;
+    element("play-invite-link").value = `${origin}${pathname}#join/${game.id}/${game.invite}`;
+  }
+}
+
+export function setUpInvite() {
+  const link = element("play-invite-link");
+
+  element("play-invite-copy").addEventListener("click", async () => {
+    link.select();
+    try {
+      await navigator.clipboard.writeText(link.value);
+      message("Invite link copied.");
+    } catch {
+      // Copying needs a secure page, which a plain http:// address is not.
+      message("Press Ctrl+C to copy the selected link.");
+    }
+  });
 }
 
 function renderStatus() {
@@ -189,8 +233,12 @@ function renderStatus() {
   const { state } = game;
   const player = describeSeat(state.current_player);
 
+  const waitingFor = Object.keys(game.seats).find((seat) => game.seats[seat].name === null);
+
   if (state.winner !== null) {
     status.textContent = `${describeSeat(state.winner)} wins!`;
+  } else if (game.invite && waitingFor) {
+    status.textContent = `Waiting for someone to join as ${NAMES[waitingFor]}.`;
   } else if (state.setup) {
     const ball = state.current_player === "First" ? " It will hold the ball." : "";
     status.textContent =

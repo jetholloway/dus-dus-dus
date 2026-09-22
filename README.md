@@ -116,6 +116,12 @@ take, so the game list shows who played what. Only the browser holding a
 seat can move that side. Nothing is verified: players are trusted to name
 themselves honestly.
 
+"New online game" gives you one side at random and a link for the other.
+Send the link to a friend: the first person to open it takes the empty seat,
+and after that the link does nothing. Until they join, neither side can move.
+Each side's moves show up for the other on the next page load; live updating
+comes next.
+
 The front page lists every saved game. Any of them can be replayed a move
 at a time, with the arrow keys or the controls under the board, and a game
 still in progress can be picked up where it was left.
@@ -155,4 +161,5 @@ state.winner                          # None until someone scores
 
 The browser UI plays full games against a random bot or hot-seat.
 
-Saved games can be listed and replayed. Planned next is multiplayer.
+Saved games can be listed and replayed, and two people can play online
+with an invite link.

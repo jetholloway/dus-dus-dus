@@ -2,7 +2,7 @@
 
 export const NAMES = { First: "Orange", Second: "Teal" };
 
-export const MODES = { bot: "vs bot", hotseat: "hot-seat" };
+export const MODES = { bot: "vs bot", hotseat: "hot-seat", online: "online" };
 
 // This browser's identity. There are no accounts: a random id says which
 // browser you are, and a name you choose is shown beside the seats you take.

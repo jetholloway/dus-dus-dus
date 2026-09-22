@@ -14,11 +14,13 @@ from pydantic import BaseModel
 
 from .games import (
     PLAYER_NAMES,
+    BadInvite,
     Game,
     Mode,
     NotYourTurn,
     ReplayFailure,
     Seat,
+    SeatTaken,
     UnreplayableGame,
     history_of,
     replay,
@@ -53,6 +55,11 @@ class PlayAction(BaseModel):
     version: int
 
 
+class JoinGame(BaseModel):
+    invite: str
+    name: str = "Anonymous"
+
+
 def create_app(db_path: Path | None = None, rng: random.Random | None = None) -> FastAPI:
     store = GameStore(db_path or default_db_path())
     rng = rng or random.Random()
@@ -63,8 +70,31 @@ def create_app(db_path: Path | None = None, rng: random.Random | None = None) ->
         if player is None:
             raise HTTPException(400, "Your browser did not say who you are")
 
-        game = Game.new(secrets.token_urlsafe(6), body.mode, player, body.name.strip()[:40])
+        game = Game.new(secrets.token_urlsafe(6), body.mode, player, _name(body.name), rng)
         store.insert(game)
+        return game_payload(game, player)
+
+    @app.post("/api/games/{game_id}/join")
+    def join_game(
+        game_id: str,
+        body: JoinGame,
+        player: str | None = Header(None, alias="X-Player"),
+    ) -> dict:
+        if player is None:
+            raise HTTPException(400, "Your browser did not say who you are")
+
+        game = _load(game_id)
+
+        try:
+            game.join(player, _name(body.name), body.invite)
+        except BadInvite as error:
+            raise HTTPException(403, str(error))
+        except SeatTaken as error:
+            raise HTTPException(409, str(error))
+
+        if not store.update(game, expected_version=game.version):
+            raise HTTPException(409, "The game has moved on since you last saw it")
+
         return game_payload(game, player)
 
     @app.get("/api/games")
@@ -150,10 +180,20 @@ def game_payload(game: Game, player_id: str | None = None) -> dict:
         "version": game.version,
         "seats": seats_payload(game.seats, player_id),
         "can_play": [PLAYER_NAMES[player] for player in game.playable_seats(player_id)],
+        # Only the players of a game get the code that invites the other side.
+        "invite": game.invite if _is_playing(game, player_id) else None,
         "state": state_payload(game.state),
         "valid_actions": [str(action) for action in game.state.valid_actions()],
         "history": game.history(),
     }
+
+
+def _is_playing(game: Game, player_id: str | None) -> bool:
+    return any(seat.belongs_to(player_id) for seat in game.seats.values())
+
+
+def _name(name: str) -> str:
+    return name.strip()[:40] or "Anonymous"
 
 
 def seats_payload(seats: dict[Player, Seat], player_id: str | None = None) -> dict:
