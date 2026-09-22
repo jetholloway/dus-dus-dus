@@ -2,21 +2,25 @@
 
 Each row holds a game's record: the list of actions, from which the current
 state is rebuilt by replaying. The record is the single source of truth, so a
-stored state can never drift from the moves that produced it.
+stored state can never drift from the moves that produced it. Alongside it sits
+who holds each seat.
 """
 
 import os
 import sqlite3
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from dus_engine import GameRecord
+from dus_engine import GameRecord, Player
 
-from .games import PLAYER_NAMES, Game, Mode
+from .games import PLAYER_NAMES, Game, Mode, Seat
 
-SCHEMA = """
+# Bumped whenever the tables change; _migrate brings older files up to it.
+SCHEMA_VERSION = 1
+
+GAMES_TABLE = """
 CREATE TABLE IF NOT EXISTS games (
     id TEXT PRIMARY KEY,
     mode TEXT NOT NULL,
@@ -28,23 +32,32 @@ CREATE TABLE IF NOT EXISTS games (
 )
 """
 
+# Added in schema version 1. Games saved before it have no seats, which leaves
+# both sides open for anyone to play.
+SEAT_COLUMNS = ("first_player", "first_name", "second_player", "second_name")
+
 
 @dataclass
 class StoredGame:
     """A row of the games table, before its moves are replayed."""
 
-    COLUMNS = "id, mode, record, created_at, updated_at"
+    COLUMNS = "id, mode, record, created_at, updated_at, " + ", ".join(SEAT_COLUMNS)
 
     id: str
     mode: Mode
     record: GameRecord
     created_at: str
     updated_at: str
+    seats: dict[Player, Seat] = field(default_factory=dict)
 
     @classmethod
     def from_row(cls, row) -> "StoredGame":
-        id, mode, record, created_at, updated_at = row
-        return cls(id, Mode(mode), GameRecord.from_json(record), created_at, updated_at)
+        id, mode, record, created_at, updated_at, first, first_name, second, second_name = row
+        seats = {
+            Player.First: Seat(first, first_name),
+            Player.Second: Seat(second, second_name),
+        }
+        return cls(id, Mode(mode), GameRecord.from_json(record), created_at, updated_at, seats)
 
 
 def default_db_path() -> Path:
@@ -63,16 +76,17 @@ class GameStore:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._db() as db:
-            db.execute(SCHEMA)
+            _migrate(db)
 
     def insert(self, game: Game) -> None:
         now = _now()
         with self._db() as db:
             db.execute(
-                "INSERT INTO games (id, mode, record, version, winner, created_at, updated_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO games (id, mode, record, version, winner, created_at, updated_at,"
+                f" {', '.join(SEAT_COLUMNS)})"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (game.id, game.mode.value, game.record.to_json(), game.version,
-                 _winner(game), now, now),
+                 _winner(game), now, now, *_seat_values(game)),
             )
 
     def update(self, game: Game, expected_version: int) -> bool:
@@ -82,10 +96,11 @@ class GameStore:
         """
         with self._db() as db:
             cursor = db.execute(
-                "UPDATE games SET record = ?, version = ?, winner = ?, updated_at = ?"
+                "UPDATE games SET record = ?, version = ?, winner = ?, updated_at = ?,"
+                f" {', '.join(f'{column} = ?' for column in SEAT_COLUMNS)}"
                 " WHERE id = ? AND version = ?",
                 (game.record.to_json(), game.version, _winner(game), _now(),
-                 game.id, expected_version),
+                 *_seat_values(game), game.id, expected_version),
             )
             return cursor.rowcount == 1
 
@@ -97,7 +112,7 @@ class GameStore:
         stored = self.load_record(id)
         if stored is None:
             return None
-        return Game.from_record(stored.id, stored.mode, stored.record)
+        return Game.from_record(stored.id, stored.mode, stored.record, stored.seats)
 
     def load_record(self, id: str) -> StoredGame | None:
         """The game's stored moves, without replaying them."""
@@ -126,6 +141,30 @@ class GameStore:
                 yield db
         finally:
             db.close()
+
+
+def _migrate(db) -> None:
+    """Bring a database, new or existing, up to the current schema."""
+    db.execute(GAMES_TABLE)
+
+    if db.execute("PRAGMA user_version").fetchone()[0] >= SCHEMA_VERSION:
+        return
+
+    columns = {row[1] for row in db.execute("PRAGMA table_info(games)")}
+    for column in SEAT_COLUMNS:
+        if column not in columns:
+            db.execute(f"ALTER TABLE games ADD COLUMN {column} TEXT")
+
+    db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+
+def _seat_values(game: Game) -> tuple:
+    return (
+        game.seat(Player.First).owner,
+        game.seat(Player.First).name,
+        game.seat(Player.Second).owner,
+        game.seat(Player.Second).name,
+    )
 
 
 def _now() -> str:

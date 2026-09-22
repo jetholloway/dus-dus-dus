@@ -12,6 +12,8 @@
     <header>
       <h1><a href="#">Dus Dus Dus</a></h1>
       <nav>
+        <label for="player-name">You are</label>
+        <input id="player-name" type="text" maxlength="40" placeholder="your name" size="12">
         <a href="#">Games</a>
         <button id="new-bot" type="button">New game vs bot</button>
         <button id="new-hotseat" type="button">New hot-seat game</button>
@@ -24,7 +26,7 @@
       <p id="games-empty" hidden>No games yet. Start one above.</p>
       <table id="games-table" class="games">
         <thead>
-          <tr><th>Started</th><th>Mode</th><th>Moves</th><th>Result</th><th></th></tr>
+          <tr><th>Started</th><th>Mode</th><th>Players</th><th>Moves</th><th>Result</th><th></th></tr>
         </thead>
         <tbody id="games-body"></tbody>
       </table>

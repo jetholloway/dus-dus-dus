@@ -31,12 +31,19 @@ function row(game) {
   tr.append(
     cell(formatDate(game.created_at)),
     cell(MODES[game.mode]),
+    cell(players(game)),
     cell(String(game.moves)),
     resultCell(game),
     linksCell(game),
   );
 
   return tr;
+}
+
+// "Jet vs Bot", with a dash for a side nobody has claimed.
+function players(game) {
+  const name = (side) => game.seats[side].name || "\u2014";
+  return `${name("First")} vs ${name("Second")}`;
 }
 
 function resultCell(game) {

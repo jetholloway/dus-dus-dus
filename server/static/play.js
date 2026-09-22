@@ -4,7 +4,7 @@
 // This view only draws the board and turns clicks into one of those actions,
 // so it never needs to know the rules.
 
-import { MODES, NAMES, api, setMessage } from "./api.js";
+import { MODES, NAMES, api, playerName, setMessage } from "./api.js";
 import { actionSquares, drawBoard } from "./board.js";
 
 let game = null;
@@ -22,7 +22,7 @@ export async function startGame(mode) {
   try {
     const created = await api("/games", {
       method: "POST",
-      body: JSON.stringify({ mode }),
+      body: JSON.stringify({ mode, name: playerName() }),
     });
     greeting = mode === "bot" ? "You are Orange. The bot plays Teal." : "";
     location.hash = `play/${created.id}`;
@@ -76,7 +76,7 @@ function canAct() {
   return (
     game !== null &&
     game.state.winner === null &&
-    game.human_players.includes(game.state.current_player)
+    game.can_play.includes(game.state.current_player)
   );
 }
 
@@ -159,7 +159,7 @@ async function submit(notation) {
 function opponentSummary(before) {
   const replies = game.history
     .slice(before)
-    .filter((entry) => !game.human_players.includes(entry.player));
+    .filter((entry) => game.seats[entry.player].is_bot);
 
   if (replies.length === 0) {
     return "";
@@ -187,26 +187,29 @@ function renderStatus() {
   }
 
   const { state } = game;
-  const player = NAMES[state.current_player];
-  const you =
-    game.mode === "bot" && game.human_players.includes(state.current_player)
-      ? " (you)"
-      : "";
+  const player = describeSeat(state.current_player);
 
   if (state.winner !== null) {
-    status.textContent = `${NAMES[state.winner]} wins!`;
+    status.textContent = `${describeSeat(state.winner)} wins!`;
   } else if (state.setup) {
     const ball = state.current_player === "First" ? " It will hold the ball." : "";
     status.textContent =
-      `Setup: ${player}${you}, choose a champion and move it two squares forward.${ball}`;
+      `Setup: ${player}, choose a champion and move it two squares forward.${ball}`;
   } else if (tackling) {
-    status.textContent = `${player}${you}: choose where the tackler goes.`;
+    status.textContent = `${player}: choose where the tackler goes.`;
   } else {
     status.textContent =
-      `${player}${you} to play: action ${state.action} of 3, turn ${state.turn}.`;
+      `${player} to play: action ${state.action} of 3, turn ${state.turn}.`;
   }
 
-  element("play-mode").textContent = MODES[game.mode];
+  element("play-mode").textContent = `${MODES[game.mode]} — ${describeSeat("First")} vs ${describeSeat("Second")}`;
+}
+
+// "Orange (you)", "Teal (Bot)", or just "Orange" for a seat nobody has taken.
+function describeSeat(side) {
+  const seat = game.seats[side];
+  const who = seat.is_you ? "you" : seat.name;
+  return who ? `${NAMES[side]} (${who})` : NAMES[side];
 }
 
 function renderBoard() {

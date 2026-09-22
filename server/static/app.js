@@ -6,6 +6,7 @@
 //
 // A bare #<id>, from before there were views, opens the game to play.
 
+import { playerName, setPlayerName } from "./api.js";
 import { showGames } from "./games.js";
 import { playKey, showPlay, startGame } from "./play.js";
 import { replayKey, setUpReplayControls, showReplay, stopReplay } from "./replay.js";
@@ -48,6 +49,10 @@ async function route() {
 }
 
 function start() {
+  const name = document.getElementById("player-name");
+  name.value = playerName();
+  name.addEventListener("change", () => setPlayerName(name.value));
+
   document.getElementById("new-bot").addEventListener("click", () => startGame("bot"));
   document.getElementById("new-hotseat").addEventListener("click", () => startGame("hotseat"));
   setUpReplayControls();

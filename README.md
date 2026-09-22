@@ -110,6 +110,12 @@ then open <http://127.0.0.1:8000>. Play against a random bot, or hot-seat
 with two people on one browser. A game's address includes its id, so
 reloading the page or bookmarking it returns to the same game.
 
+Set a name in the box at the top. Your browser remembers it, along with a
+random id that identifies it, and both are recorded against the seats you
+take, so the game list shows who played what. Only the browser holding a
+seat can move that side. Nothing is verified: players are trusted to name
+themselves honestly.
+
 The front page lists every saved game. Any of them can be replayed a move
 at a time, with the arrow keys or the controls under the board, and a game
 still in progress can be picked up where it was left.

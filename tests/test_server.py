@@ -21,22 +21,27 @@ def client(db_path):
     return TestClient(create_app(db_path, rng=random.Random(0)))
 
 
-def new_game(client, mode="hotseat"):
-    response = client.post("/api/games", json={"mode": mode})
+JET = {"X-Player": "player-jet"}
+SAM = {"X-Player": "player-sam"}
+
+
+def new_game(client, mode="hotseat", name="Jet", headers=JET):
+    response = client.post("/api/games", json={"mode": mode, "name": name}, headers=headers)
     assert response.status_code == 201
     return response.json()
 
 
-def play(client, game, action):
+def play(client, game, action, headers=JET):
     return client.post(
         f"/api/games/{game['id']}/actions",
         json={"action": action, "version": game["version"]},
+        headers=headers,
     )
 
 
-def store_record(db_path, id, record, mode=Mode.HOTSEAT):
+def store_record(db_path, id, record, mode=Mode.HOTSEAT, seats=None):
     """Save a record straight to the database, as an older server might have."""
-    GameStore(db_path).insert(Game(id, mode, record, GameState()))
+    GameStore(db_path).insert(Game(id, mode, record, GameState(), seats or {}))
 
 
 def finished_record(seed=0):
@@ -111,7 +116,7 @@ def test_an_unknown_game_is_not_found(client):
 
 def test_the_bot_replies_within_the_same_request(client):
     game = new_game(client, mode="bot")
-    assert game["human_players"] == ["First"]
+    assert game["can_play"] == ["First"]
 
     game = play(client, game, "MOVE D1 D3").json()
 
@@ -140,15 +145,83 @@ def test_a_bot_game_can_be_played_to_the_end(client):
     assert response.json()["detail"] == "Game is over"
 
 
+def test_a_game_records_who_is_playing_it(client):
+    game = new_game(client, mode="bot", name="Jet")
+
+    assert game["seats"]["First"] == {"name": "Jet", "is_bot": False, "is_you": True}
+    assert game["seats"]["Second"] == {"name": "Bot", "is_bot": True, "is_you": False}
+    assert game["can_play"] == ["First"]
+
+    # Someone else sees the same seats, but none of them as theirs to play.
+    seen = client.get(f"/api/games/{game['id']}", headers=SAM).json()
+    assert seen["seats"]["First"]["name"] == "Jet"
+    assert seen["seats"]["First"]["is_you"] is False
+    assert seen["can_play"] == []
+
+
+def test_only_the_player_holding_a_seat_can_move(client):
+    game = new_game(client)
+
+    refused = play(client, game, "MOVE D1 D3", headers=SAM)
+
+    assert refused.status_code == 403
+    assert "Jet" in refused.json()["detail"]
+    assert play(client, game, "MOVE D1 D3", headers=JET).status_code == 200
+
+
+def test_a_hot_seat_game_lets_its_owner_play_both_sides(client):
+    game = new_game(client)
+
+    game = play(client, game, "MOVE D1 D3").json()
+    assert game["state"]["current_player"] == "Second"
+    assert game["can_play"] == ["First", "Second"]
+
+    assert play(client, game, "MOVE A7 A5").status_code == 200
+
+
+def test_a_game_from_before_seats_existed_is_open_to_anyone(client, db_path):
+    store_record(db_path, "legacy", GameRecord(actions=[Action("MOVE D1 D3")]))
+
+    game = client.get("/api/games/legacy", headers=SAM).json()
+
+    assert game["seats"]["First"]["name"] is None
+    assert game["can_play"] == ["First", "Second"]
+    assert play(client, game, "MOVE A7 A5", headers=SAM).status_code == 200
+
+
+def test_an_older_database_gains_seats_without_losing_games(db_path):
+    import sqlite3
+
+    # A database as the previous version wrote it: no seat columns, no version.
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "CREATE TABLE games (id TEXT PRIMARY KEY, mode TEXT NOT NULL, record TEXT NOT NULL,"
+            " version INTEGER NOT NULL, winner TEXT, created_at TEXT NOT NULL,"
+            " updated_at TEXT NOT NULL)"
+        )
+        db.execute(
+            "INSERT INTO games VALUES ('old', 'hotseat', ?, 1, NULL, '2026-01-01', '2026-01-01')",
+            (GameRecord(actions=[Action("MOVE D1 D3")]).to_json(),),
+        )
+
+    client = TestClient(create_app(db_path, rng=random.Random(0)))
+    game = client.get("/api/games/old", headers=JET).json()
+
+    assert game["version"] == 1
+    assert game["seats"]["First"]["name"] is None
+    assert [summary["id"] for summary in client.get("/api/games").json()] == ["old"]
+
+
 def test_games_survive_a_restart(db_path):
     first_server = TestClient(create_app(db_path, rng=random.Random(0)))
     game = new_game(first_server, mode="bot")
     game = play(first_server, game, "MOVE D1 D3").json()
 
     second_server = TestClient(create_app(db_path, rng=random.Random(0)))
-    restored = second_server.get(f"/api/games/{game['id']}").json()
+    restored = second_server.get(f"/api/games/{game['id']}", headers=JET).json()
 
     assert restored == game
+    assert restored["seats"]["First"]["name"] == "Jet"
 
 
 def test_a_game_the_current_rules_forbid_is_reported_not_crashed_on(client, db_path):
@@ -174,6 +247,7 @@ def test_games_are_listed_most_recent_first(client):
     assert [summary["id"] for summary in summaries] == [newer["id"], older["id"]]
     assert summaries[0]["mode"] == "bot"
     assert summaries[0]["moves"] == 2
+    assert summaries[0]["seats"]["First"]["name"] == "Jet"
 
 
 def test_the_list_says_how_each_game_stands(client, db_path):
