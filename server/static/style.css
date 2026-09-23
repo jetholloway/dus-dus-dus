@@ -6,6 +6,8 @@
   --second: #1f6f78;
   --ball: #2fbf3f;
   --highlight: #f06bdc;
+  --first-arrow: #d97a06; /* darker than --first, to show up on the board */
+  --second-arrow: #16545b;
   --text: #222;
   font-family: system-ui, sans-serif;
   color: var(--text);
@@ -79,6 +81,7 @@ nav button {
 
 /* The board: a label column plus seven files, seven ranks plus a label row. */
 .board {
+  position: relative; /* for the arrows laid over the squares */
   display: grid;
   grid-template-columns: 1.5rem repeat(7, var(--square));
   grid-auto-rows: var(--square);
@@ -134,10 +137,6 @@ nav button {
 .square.pass-target,
 .square.tackle-target {
   box-shadow: inset 0 0 0 4px var(--highlight);
-}
-
-.square.last {
-  background-image: linear-gradient(rgba(0, 0, 0, 0.07), rgba(0, 0, 0, 0.07));
 }
 
 /* Pieces: a rounded square with a disc in the middle, as in the rulebook. */
@@ -301,4 +300,71 @@ nav button {
 .invite button {
   font: inherit;
   cursor: pointer;
+}
+
+/* Arrows for recent actions, drawn over the squares in square-sized units:
+   one unit is one square, so sizes here are fractions of a square. */
+.arrows {
+  position: absolute;
+  top: 0;
+  left: 1.5rem; /* past the rank labels */
+  width: calc(7 * var(--square));
+  height: calc(7 * var(--square));
+  overflow: visible;
+  pointer-events: none;
+}
+
+.arrow {
+  opacity: 0.85;
+}
+
+.arrow.faint {
+  opacity: 0.5;
+}
+
+.arrow line {
+  stroke-width: 0.08;
+  stroke-linecap: round;
+}
+
+/* A pass moves only the ball, so its path is dashed. */
+.arrow.pass line {
+  stroke-dasharray: 0.14 0.1;
+}
+
+.arrow.first line,
+.arrow.first .took-ball,
+.arrow.first .number {
+  stroke: var(--first-arrow);
+}
+
+.arrow.second line,
+.arrow.second .took-ball,
+.arrow.second .number {
+  stroke: var(--second-arrow);
+}
+
+.arrowhead.first {
+  fill: var(--first-arrow);
+}
+
+.arrowhead.second {
+  fill: var(--second-arrow);
+}
+
+.took-ball {
+  fill: none;
+  stroke-width: 0.05;
+}
+
+.arrow .number {
+  fill: #fff;
+  stroke-width: 0.03;
+}
+
+.arrow text {
+  font: 600 0.2px system-ui, sans-serif;
+  text-anchor: middle;
+  dominant-baseline: central;
+  fill: var(--text);
 }

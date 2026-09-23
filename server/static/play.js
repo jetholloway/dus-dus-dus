@@ -5,7 +5,8 @@
 // so it never needs to know the rules.
 
 import { MODES, NAMES, api, playerName, setMessage } from "./api.js";
-import { actionSquares, drawBoard } from "./board.js";
+import { drawBoard } from "./board.js";
+import { playArrows } from "./turns.js";
 
 // How often to ask the server whether an unfinished game has changed.
 const POLL_MS = 2000;
@@ -341,14 +342,13 @@ function renderBoard() {
   }
 
   const actions = parseActions();
-  const lastEntry = game.history.at(-1);
 
   drawBoard(board, game.state, {
     onSquare,
     selected,
     targets: targetSquares(actions),
     movable: selected === null ? new Set(actions.map((action) => action.src)) : new Set(),
-    last: lastEntry ? actionSquares(lastEntry.action) : new Set(),
+    arrows: playArrows(game),
   });
 }
 
