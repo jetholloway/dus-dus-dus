@@ -43,8 +43,10 @@ async function route() {
   stopReplay();
   current = VIEWS[name];
 
+  // Compare sections, not views: join shows the play section, and deciding
+  // per view would hide it again straight after play had shown it.
   for (const view of Object.values(VIEWS)) {
-    document.getElementById(view.element).hidden = view !== current;
+    document.getElementById(view.element).hidden = view.element !== current.element;
   }
 
   await current.show(id, extra);
