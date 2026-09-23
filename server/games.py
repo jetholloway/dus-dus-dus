@@ -116,6 +116,9 @@ class Game:
     seats: dict[Player, Seat] = field(default_factory=dict)
     # The code that claims the empty seat of an online game, until someone does.
     invite: str | None = None
+    # When the game was last saved. It changes with every move and every join,
+    # which lets a waiting browser tell cheaply whether there's anything new.
+    updated_at: str | None = None
 
     @classmethod
     def new(
@@ -160,6 +163,7 @@ class Game:
         record: GameRecord,
         seats: dict[Player, Seat] | None = None,
         invite: str | None = None,
+        updated_at: str | None = None,
     ) -> "Game":
         """Rebuild a game by replaying its record, which also validates it."""
         states, failure = replay(record)
@@ -172,6 +176,7 @@ class Game:
             state=states[-1],
             seats=seats or {},
             invite=invite,
+            updated_at=updated_at,
         )
 
     @property

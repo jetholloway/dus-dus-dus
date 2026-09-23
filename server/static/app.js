@@ -9,7 +9,7 @@
 
 import { playerName, setPlayerName } from "./api.js";
 import { showGames } from "./games.js";
-import { joinGame, playKey, setUpInvite, showPlay, startGame } from "./play.js";
+import { joinGame, playKey, setUpInvite, showPlay, startGame, stopPlay } from "./play.js";
 import { replayKey, setUpReplayControls, showReplay, stopReplay } from "./replay.js";
 
 const VIEWS = {
@@ -41,6 +41,7 @@ async function route() {
   }
 
   stopReplay();
+  stopPlay();
   current = VIEWS[name];
 
   // Compare sections, not views: join shows the play section, and deciding

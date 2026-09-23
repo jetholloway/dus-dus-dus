@@ -93,21 +93,28 @@ class GameStore:
                 (game.id, game.mode.value, game.record.to_json(), game.version,
                  _winner(game), now, now, *_seat_values(game)),
             )
+        game.updated_at = now
 
     def update(self, game: Game, expected_version: int) -> bool:
         """Save a game only if nobody else saved it since `expected_version`.
 
         Returns False, changing nothing, if the stored game has moved on.
         """
+        now = _now()
         with self._db() as db:
             cursor = db.execute(
                 "UPDATE games SET record = ?, version = ?, winner = ?, updated_at = ?,"
                 f" {', '.join(f'{column} = ?' for column in SEAT_COLUMNS)}"
                 " WHERE id = ? AND version = ?",
-                (game.record.to_json(), game.version, _winner(game), _now(),
+                (game.record.to_json(), game.version, _winner(game), now,
                  *_seat_values(game), game.id, expected_version),
             )
-            return cursor.rowcount == 1
+
+        if cursor.rowcount != 1:
+            return False
+
+        game.updated_at = now
+        return True
 
     def load(self, id: str) -> Game | None:
         """The game with this id, ready to play, or None if there isn't one.
@@ -118,8 +125,18 @@ class GameStore:
         if stored is None:
             return None
         return Game.from_record(
-            stored.id, stored.mode, stored.record, stored.seats, stored.invite
+            stored.id, stored.mode, stored.record, stored.seats, stored.invite, stored.updated_at
         )
+
+    def stamp(self, id: str) -> tuple[int, str] | None:
+        """A game's version and when it was last saved, without loading it.
+
+        Cheap enough to ask every couple of seconds.
+        """
+        with self._db() as db:
+            return db.execute(
+                "SELECT version, updated_at FROM games WHERE id = ?", (id,)
+            ).fetchone()
 
     def load_record(self, id: str) -> StoredGame | None:
         """The game's stored moves, without replaying them."""

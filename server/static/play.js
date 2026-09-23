@@ -7,7 +7,11 @@
 import { MODES, NAMES, api, playerName, setMessage } from "./api.js";
 import { actionSquares, drawBoard } from "./board.js";
 
+// How often to ask the server whether an unfinished game has changed.
+const POLL_MS = 2000;
+
 let game = null;
+let pollTimer = null;
 // The square of the piece the player has picked, or null.
 let selected = null;
 // True once the player has clicked the ball to tackle it with `selected`.
@@ -48,6 +52,7 @@ export async function joinGame(id, invite) {
 }
 
 export async function showPlay(id) {
+  stopPlay();
   game = null;
   clearSelection();
   message(greeting);
@@ -68,6 +73,63 @@ export async function showPlay(id) {
     }
   }
 
+  render();
+  schedulePoll();
+}
+
+// Stops watching the game for changes, when leaving the play view.
+export function stopPlay() {
+  clearTimeout(pollTimer);
+  pollTimer = null;
+}
+
+// Other players' moves, and friends joining, arrive by asking the server every
+// couple of seconds whether the game has changed. The question is cheap; the
+// whole game is only fetched when the answer is yes.
+function schedulePoll() {
+  stopPlay();
+
+  if (game !== null && game.state.winner === null) {
+    pollTimer = setTimeout(poll, POLL_MS);
+  }
+}
+
+async function poll() {
+  const id = game?.id;
+
+  try {
+    if (id && !document.hidden) {
+      const stamp = await api(`/games/${id}/stamp`);
+      if (game?.id === id && stamp.updated_at !== game.updated_at) {
+        await refresh();
+      }
+    }
+  } catch {
+    // A missed poll is harmless: the next one will catch up.
+  }
+
+  if (game?.id === id) {
+    schedulePoll();
+  }
+}
+
+async function refresh() {
+  const before = game;
+  const latest = await api(`/games/${game.id}`);
+
+  if (latest.id !== game?.id) {
+    return;
+  }
+
+  game = latest;
+  const news = [joinedSummary(before), othersSummary(before.history.length)];
+  const text = news.filter(Boolean).join(" ");
+  if (text) {
+    message(text);
+  }
+
+  // A piece picked in the old position may have nothing left to do.
+  clearSelection();
   render();
 }
 
@@ -160,7 +222,7 @@ async function submit(notation) {
       method: "POST",
       body: JSON.stringify({ action: notation, version: game.version }),
     });
-    message(opponentSummary(before));
+    message(othersSummary(before));
   } catch (error) {
     message(error.message, true);
     if (error.status === 409) {
@@ -170,20 +232,30 @@ async function submit(notation) {
 
   clearSelection();
   render();
+  schedulePoll();
 }
 
-// Describes what the bot did in reply, if anything.
-function opponentSummary(before) {
-  const replies = game.history
+// Describes moves made by sides this browser doesn't play: the bot's reply,
+// or an opponent's turn arriving by poll.
+function othersSummary(before) {
+  const theirs = game.history
     .slice(before)
-    .filter((entry) => game.seats[entry.player].is_bot);
+    .filter((entry) => !game.can_play.includes(entry.player));
 
-  if (replies.length === 0) {
+  if (theirs.length === 0) {
     return "";
   }
 
-  const player = NAMES[replies[0].player];
-  return `${player} (bot) played ${replies.map((entry) => entry.action).join(", ")}.`;
+  const side = describeSeat(theirs[0].player);
+  return `${side} played ${theirs.map((entry) => entry.action).join(", ")}.`;
+}
+
+// "Sam joined as Teal." when a waiting seat has been taken since `before`.
+function joinedSummary(before) {
+  const side = Object.keys(game.seats).find(
+    (seat) => before.seats[seat].name === null && game.seats[seat].name !== null,
+  );
+  return side ? `${game.seats[side].name} joined as ${NAMES[side]}.` : "";
 }
 
 // Drawing

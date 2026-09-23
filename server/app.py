@@ -105,6 +105,15 @@ def create_app(db_path: Path | None = None, rng: random.Random | None = None) ->
     def get_game(game_id: str, player: str | None = Header(None, alias="X-Player")) -> dict:
         return game_payload(_load(game_id), player)
 
+    @app.get("/api/games/{game_id}/stamp")
+    def get_stamp(game_id: str) -> dict:
+        """Whether a game has changed, for a browser waiting on someone else."""
+        stamp = store.stamp(game_id)
+        if stamp is None:
+            raise HTTPException(404, "No such game")
+        version, updated_at = stamp
+        return {"version": version, "updated_at": updated_at}
+
     @app.get("/api/games/{game_id}/replay")
     def get_replay(game_id: str) -> dict:
         stored = store.load_record(game_id)
@@ -178,6 +187,7 @@ def game_payload(game: Game, player_id: str | None = None) -> dict:
         "id": game.id,
         "mode": game.mode.value,
         "version": game.version,
+        "updated_at": game.updated_at,
         "seats": seats_payload(game.seats, player_id),
         "can_play": [PLAYER_NAMES[player] for player in game.playable_seats(player_id)],
         # Only the players of a game get the code that invites the other side.

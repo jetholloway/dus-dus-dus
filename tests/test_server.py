@@ -306,6 +306,48 @@ def test_online_players_can_only_move_their_own_side(client):
     assert play(client, game, "MOVE A7 A5", headers=second).status_code == 200
 
 
+def stamp(client, game):
+    response = client.get(f"/api/games/{game['id']}/stamp")
+    assert response.status_code == 200
+    return response.json()
+
+
+def test_the_stamp_matches_the_game_it_describes(client):
+    game = new_game(client)
+
+    assert stamp(client, game) == {"version": 0, "updated_at": game["updated_at"]}
+
+
+def test_a_move_changes_the_stamp(client):
+    game = new_game(client, mode="online")
+    game = join(client, game, name="Sam", headers=SAM).json()
+    before = stamp(client, game)
+
+    first = JET if game["seats"]["First"]["name"] == "Jet" else SAM
+    moved = play(client, game, "MOVE D1 D3", headers=first).json()
+
+    after = stamp(client, game)
+    assert after["version"] == before["version"] + 1
+    assert after["updated_at"] != before["updated_at"]
+    assert after["updated_at"] == moved["updated_at"]
+
+
+def test_a_friend_joining_changes_the_stamp_but_not_the_version(client):
+    # A waiting player has no move to notice, so the stamp has to show the join.
+    game = new_game(client, mode="online")
+    before = stamp(client, game)
+
+    join(client, game, name="Sam", headers=SAM)
+
+    after = stamp(client, game)
+    assert after["version"] == before["version"]
+    assert after["updated_at"] != before["updated_at"]
+
+
+def test_the_stamp_of_an_unknown_game_is_not_found(client):
+    assert client.get("/api/games/nope/stamp").status_code == 404
+
+
 def _taken_and_open(game):
     """The side the game's creator took, and the one still waiting."""
     taken = [side for side, seat in game["seats"].items() if seat["is_you"]]

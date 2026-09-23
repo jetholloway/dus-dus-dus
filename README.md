@@ -119,8 +119,10 @@ themselves honestly.
 "New online game" gives you one side at random and a link for the other.
 Send the link to a friend: the first person to open it takes the empty seat,
 and after that the link does nothing. Until they join, neither side can move.
-Each side's moves show up for the other on the next page load; live updating
-comes next.
+
+An open game page checks with the server every two seconds, while the tab is
+visible and the game unfinished, so your opponent's moves and their joining
+appear on their own. Anyone watching a game sees it update the same way.
 
 The front page lists every saved game. Any of them can be replayed a move
 at a time, with the arrow keys or the controls under the board, and a game
