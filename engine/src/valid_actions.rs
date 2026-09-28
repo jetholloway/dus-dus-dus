@@ -11,11 +11,40 @@ const MOVE_DISPLACEMENTS: [Displacement; 8] = [
     Displacement { x: 0, y: 2 },
 ];
 
+/// A legal action together with the state it leads to, so a caller searching
+/// ahead need not apply each action a second time.
+#[derive(Debug, Clone)]
+pub struct Transition {
+    pub action: Action,
+    pub state: GameState,
+    /// Set when the action wins the game.
+    pub winner: Option<Player>,
+}
+
 impl GameState {
     pub fn valid_actions(&self) -> Vec<Action> {
+        self.valid_transitions()
+            .into_iter()
+            .map(|transition| transition.action)
+            .collect()
+    }
+
+    pub fn valid_transitions(&self) -> Vec<Transition> {
         self.candidate_actions()
             .into_iter()
-            .filter(|action| !matches!(action.try_apply(self), ActionResult::Invalid(_)))
+            .filter_map(|action| match action.try_apply(self) {
+                ActionResult::Invalid(_) => None,
+                ActionResult::Valid { state } => Some(Transition {
+                    action,
+                    state,
+                    winner: None,
+                }),
+                ActionResult::Terminal { state, winner } => Some(Transition {
+                    action,
+                    state,
+                    winner: Some(winner),
+                }),
+            })
             .collect()
     }
 
@@ -124,6 +153,53 @@ mod tests {
                     ActionResult::Valid { state: next_state } => state = next_state,
                     ActionResult::Terminal { .. } => break,
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn valid_transitions_match_applying_each_action() {
+        let mut rng = StdRng::seed_from_u64(20260929);
+
+        for game in 0..GAMES {
+            let mut state = GameState::new();
+
+            for _ in 0..MAX_ACTIONS_PER_GAME {
+                let transitions = state.valid_transitions();
+
+                assert_eq!(
+                    transitions
+                        .iter()
+                        .map(|t| t.action.clone())
+                        .collect::<Vec<_>>(),
+                    state.valid_actions(),
+                    "game {game}"
+                );
+
+                for transition in &transitions {
+                    match transition.action.try_apply(&state) {
+                        ActionResult::Invalid(error) => panic!("valid action rejected: {error}"),
+                        ActionResult::Valid { state: next_state } => {
+                            assert_eq!(transition.state, next_state, "game {game}");
+                            assert_eq!(transition.winner, None, "game {game}");
+                        }
+                        ActionResult::Terminal {
+                            state: next_state,
+                            winner,
+                        } => {
+                            assert_eq!(transition.state, next_state, "game {game}");
+                            assert_eq!(transition.winner, Some(winner), "game {game}");
+                        }
+                    }
+                }
+
+                let transition = transitions
+                    .choose(&mut rng)
+                    .expect("non-terminal state should have valid transitions");
+                if transition.winner.is_some() {
+                    break;
+                }
+                state = transition.state.clone();
             }
         }
     }
