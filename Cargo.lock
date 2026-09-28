@@ -858,9 +858,9 @@ dependencies = [
 name = "dus-dus-dus"
 version = "0.1.0"
 dependencies = [
+ "bots",
  "burn",
  "engine",
- "rand",
  "text_io",
 ]
 

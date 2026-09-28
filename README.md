@@ -81,7 +81,7 @@ just sync          # create or update the Python environment
 just develop       # build the Python bindings into the environment
 just test          # Rust tests
 just test-py       # Python tests, after just develop
-just trial         # play random games and report win counts
+just arena         # pit two bots against each other
 ```
 
 Re-run `just develop` after changing any Rust in `engine/` or `bindings/`;
@@ -99,6 +99,31 @@ micromamba activate dus-dus-dus
 
 Build in release mode for anything that plays a lot of games. A debug build is
 roughly sixteen times slower.
+
+## Bots
+
+Computer players live in the `bots` crate. Each implements a `Bot` trait
+that picks one action at a time. So far the only one is `random`, which
+plays a uniformly random legal action. It is the baseline for stronger bots.
+
+The arena plays two bots against each other and reports how often each
+wins:
+
+```bash
+just arena random random 1000
+```
+
+Bot A plays `O` in even-numbered games and `X` in odd ones, so neither
+gains from moving first. A game that reaches 3,000 actions is a draw, and
+so is one where a player has no legal action. The report gives each bot's
+wins overall and by side, a win rate with its 95% margin of error, the mean
+time a bot takes per action, and the mean game length. Extra options go
+after the game count, e.g. `just arena random random 1000 --seed 7`.
+Everything is derived from the seed (default 0), so the same command gives
+the same results.
+
+`just play` plays a game in the terminal. Each side is `console`, where
+you type actions like `MOVE A1 A3`, or a bot's name.
 
 ## Playing in the browser
 
@@ -141,7 +166,8 @@ a file-syncing service copying a live database mid-write can corrupt it.
 | Path | What it is |
 | --- | --- |
 | `engine/` | The game: board, positions, rules, legal action enumeration, game records. No dependencies beyond serde. |
-| `dus-dus-dus/` | Command line binary. Console and random players, and the game loop. |
+| `bots/` | Computer players, behind a `Bot` trait. |
+| `dus-dus-dus/` | Command line binary: the bot arena and terminal play. |
 | `bindings/` | The `dus_engine` Python module, built with maturin. Outside the Cargo workspace so Rust builds never need Python. |
 | `server/` | The web server: a FastAPI JSON API over the engine, SQLite storage, and the browser client in `server/static/`. |
 | `tests/` | Python tests for the bindings and the server. |

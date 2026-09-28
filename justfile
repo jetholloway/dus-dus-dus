@@ -38,9 +38,13 @@ test-py:
 # Run every test.
 test-all: test test-py
 
-# Play random games and report the win counts. Slow without --release.
-trial:
-    cargo run --release -p dus-dus-dus
+# Pit two bots against each other and report win rates, e.g. `just arena random random 1000`.
+arena a="random" b="random" games="1000" *options="":
+    cargo run --release -q -p dus-dus-dus -- arena {{a}} {{b}} --games {{games}} {{options}}
+
+# Play in the terminal, against a bot or another person.
+play:
+    cargo run --release -q -p dus-dus-dus -- play
 
 # Format and lint the Rust code.
 fmt:
