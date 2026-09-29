@@ -145,6 +145,7 @@ fn report(options: &ArenaOptions, outcomes: &[GameOutcome]) -> String {
         total_actions,
     } = summarize(options, outcomes);
     let games = outcomes.len();
+    let width = 16.max(2 + options.bot_a.len().max(options.bot_b.len()));
     let row = |label: String, tally: &Tally| {
         let wins = tally.wins();
         let rate = wins as f64 / games as f64;
@@ -155,7 +156,7 @@ fn report(options: &ArenaOptions, outcomes: &[GameOutcome]) -> String {
             tally.think / tally.choices as u32
         };
         format!(
-            "{label:<16} {wins:>6} {:>6} {:>6}  {:>5.1}% ± {:>4.1}%  {think:>10.1?}\n",
+            "{label:<width$} {wins:>6} {:>6} {:>6}  {:>5.1}% ± {:>4.1}%  {think:>10.1?}\n",
             tally.wins_as_first,
             tally.wins_as_second,
             100.0 * rate,
@@ -168,13 +169,13 @@ fn report(options: &ArenaOptions, outcomes: &[GameOutcome]) -> String {
         options.bot_a, options.bot_b, options.seed, options.max_actions
     );
     out += &format!(
-        "{:<16} {:>6} {:>6} {:>6}  {:>14}  {:>10}\n",
+        "{:<width$} {:>6} {:>6} {:>6}  {:>14}  {:>10}\n",
         "", "wins", "as O", "as X", "win rate", "per action"
     );
     out += &row(format!("A {}", options.bot_a), &a);
     out += &row(format!("B {}", options.bot_b), &b);
     out += &format!(
-        "{:<16} {:>6}  ({capped} at the cap, {stuck} with no legal action)\n\n",
+        "{:<width$} {:>6}  ({capped} at the cap, {stuck} with no legal action)\n\n",
         "draws",
         capped + stuck
     );

@@ -1,8 +1,10 @@
 //! Computer players. The engine knows the rules; this crate decides what to
 //! play.
 
+mod heuristic_bot;
 mod random_bot;
 
+pub use heuristic_bot::*;
 pub use random_bot::*;
 
 use engine::{Action, GameState};
@@ -16,12 +18,20 @@ pub trait Bot {
 }
 
 /// The names `make_bot` accepts.
-pub const BOT_NAMES: [&str; 1] = ["random"];
+pub const BOT_NAMES: [&str; 2] = ["random", "heuristic"];
 
 /// Makes a bot by name. The seed makes any randomness in it repeatable.
+///
+/// `heuristic` takes optional weight overrides after a colon, e.g.
+/// `heuristic:possession=12,open_lane=30`; see [`Weights`].
 pub fn make_bot(name: &str, seed: u64) -> Result<Box<dyn Bot>, String> {
-    match name.trim().to_ascii_lowercase().as_str() {
-        "random" => Ok(Box::new(RandomBot::new(seed))),
+    let (kind, options) = name.trim().split_once(':').unwrap_or((name.trim(), ""));
+    match (kind.to_ascii_lowercase().as_str(), options) {
+        ("random", "") => Ok(Box::new(RandomBot::new(seed))),
+        ("heuristic", overrides) => Ok(Box::new(HeuristicBot::new(
+            Weights::with_overrides(overrides)?,
+            seed,
+        ))),
         _ => Err(format!(
             "unknown bot {name:?}; expected one of: {}",
             BOT_NAMES.join(", ")
@@ -43,5 +53,12 @@ mod tests {
     #[test]
     fn unknown_name_is_an_error() {
         assert!(make_bot("genius", 0).is_err());
+    }
+
+    #[test]
+    fn heuristic_takes_weight_overrides() {
+        assert!(make_bot("heuristic:possession=12,open_lane=30", 0).is_ok());
+        assert!(make_bot("heuristic:luck=3", 0).is_err());
+        assert!(make_bot("random:possession=12", 0).is_err());
     }
 }

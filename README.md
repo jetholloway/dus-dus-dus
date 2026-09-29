@@ -113,14 +113,34 @@ roughly sixteen times slower.
 ## Bots
 
 Computer players live in the `bots` crate. Each implements a `Bot` trait
-that picks one action at a time. So far the only one is `random`, which
-plays a uniformly random legal action. It is the baseline for stronger bots.
+that picks one action at a time. There are two:
+
+- `random` plays a uniformly random legal action. It is the baseline.
+- `heuristic` tries every sequence of actions that finishes its turn,
+  scores the position each one leads to, and plays the best. It does not
+  look at the opponent's reply. A win scores +infinity; otherwise the score
+  is a weighted sum of features, each counting for the bot and against it
+  when the opponent has the same thing:
+
+  | Weight | Default | Counts |
+  | --- | --- | --- |
+  | `possession` | 10 | holding the ball |
+  | `ball_advance` | 2 | per rank the ball has advanced |
+  | `piece_advance` | 0.5 | per rank each piece has advanced |
+  | `receiver` | 3 | per piece on the opponent's back rank |
+  | `open_lane` | 20 | the ball has a clear pass to one of those pieces |
+  | `carrier_adjacent` | -6 | per opponent piece next to the ball holder |
+  | `carrier_nearby` | -2 | per opponent piece 2 or 3 squares from it |
+
+  Override any of them after a colon to try new values without
+  recompiling, e.g. `heuristic:possession=12,open_lane=30`.
 
 The arena plays two bots against each other and reports how often each
 wins:
 
 ```bash
 just arena random random 1000
+just arena heuristic:open_lane=30 heuristic 1000
 ```
 
 Bot A plays `O` in even-numbered games and `X` in odd ones, so neither
