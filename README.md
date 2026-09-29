@@ -47,7 +47,15 @@ Actions are written as `MOVE A1 A3`, `PASS A3 D3`, `TACKLE B4 B5`.
 
 ## Prerequisites
 
-A Rust toolchain, plus two tools:
+A Rust toolchain with `rustfmt` and `clippy`, plus two tools. With rustup,
+`rust-toolchain.toml` installs the Rust components for you. With Debian's
+Rust packages, install them yourself:
+
+```bash
+sudo apt install rustfmt rust-clippy
+```
+
+The two tools:
 
 - [`micromamba`](https://mamba.readthedocs.io/) manages the Python environment.
   It also provides Python itself, so no system Python is needed.
@@ -82,6 +90,8 @@ just develop       # build the Python bindings into the environment
 just test          # Rust tests
 just test-py       # Python tests, after just develop
 just arena         # pit two bots against each other
+just fmt           # format the Rust code
+just lint          # check the Rust code with clippy
 ```
 
 Re-run `just develop` after changing any Rust in `engine/` or `bindings/`;
