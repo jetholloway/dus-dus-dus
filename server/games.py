@@ -5,14 +5,24 @@ import secrets
 from dataclasses import dataclass, field
 from enum import Enum
 
-from dus_engine import Action, GameRecord, GameState, InvalidAction, Player
+from dus_engine import Action, Bot, GameRecord, GameState, InvalidAction, Player
 
 PLAYER_NAMES = {Player.First: "First", Player.Second: "Second"}
 PLAYERS = {name: player for player, name in PLAYER_NAMES.items()}
 
-# The owner recorded for a seat the bot plays.
+# The owner recorded for a bot's seat is "bot:" and which bot, e.g.
+# "bot:heuristic". Games saved before there was a choice of bots have plain
+# "bot", which was the random bot.
 BOT = "bot"
-BOT_NAME = "Bot"
+BOT_PREFIX = "bot:"
+
+
+class BotKind(str, Enum):
+    RANDOM = "random"
+    HEURISTIC = "heuristic"
+
+
+BOT_NAMES = {BotKind.RANDOM: "Random bot", BotKind.HEURISTIC: "Heuristic bot"}
 
 
 class Mode(str, Enum):
@@ -49,12 +59,25 @@ class Seat:
     before seats existed have two open seats, which keeps them playable.
     """
 
-    owner: str | None = None  # a browser's player id, or BOT
+    owner: str | None = None  # a browser's player id, or a bot's
     name: str | None = None
+
+    @classmethod
+    def for_bot(cls, kind: BotKind) -> "Seat":
+        return cls(BOT_PREFIX + kind.value, BOT_NAMES[kind])
 
     @property
     def is_bot(self) -> bool:
-        return self.owner == BOT
+        return self.owner is not None and (self.owner == BOT or self.owner.startswith(BOT_PREFIX))
+
+    @property
+    def bot_kind(self) -> BotKind | None:
+        """Which bot plays this seat, or None for a person's."""
+        if not self.is_bot:
+            return None
+        if self.owner == BOT:
+            return BotKind.RANDOM
+        return BotKind(self.owner.removeprefix(BOT_PREFIX))
 
     def belongs_to(self, player_id: str | None) -> bool:
         return self.owner is not None and self.owner == player_id
@@ -128,11 +151,12 @@ class Game:
         player_id: str,
         player_name: str,
         rng: random.Random | None = None,
+        bot: BotKind = BotKind.HEURISTIC,
     ) -> "Game":
         """A new game, with its seats given to whoever asked for it.
 
         In hot-seat both seats are theirs, since one browser plays both sides.
-        Against the bot they take Orange and the bot takes Teal. Online they
+        Against a bot they take Orange and the bot takes Teal. Online they
         take one side at random and the other waits for a friend to join.
         """
         player = Seat(player_id, player_name)
@@ -140,7 +164,7 @@ class Game:
         invite = None
 
         if mode is Mode.BOT:
-            seats[Player.Second] = Seat(BOT, BOT_NAME)
+            seats[Player.Second] = Seat.for_bot(bot)
         elif mode is Mode.ONLINE:
             theirs = (rng or random.Random()).choice(list(PLAYER_NAMES))
             seats[theirs] = Seat()
@@ -246,11 +270,15 @@ class Game:
 
         self._apply(Action(notation))
 
+        if not self.is_bot_turn():
+            return
+
+        bot = Bot(self.seat(self.state.current_player).bot_kind.value, rng.getrandbits(64))
         while self.is_bot_turn():
-            actions = self.state.valid_actions()
-            if not actions:
+            action = bot.choose(self.state)
+            if action is None:
                 raise RuntimeError("The bot has no legal action in a game that isn't won")
-            self._apply(rng.choice(actions))
+            self._apply(action)
 
     def history(self) -> list[dict]:
         """Every action so far, with the player who made it."""

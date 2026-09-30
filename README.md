@@ -161,8 +161,9 @@ you type actions like `MOVE A1 A3`, or a bot's name.
 just serve
 ```
 
-then open <http://127.0.0.1:8000>. Play against a random bot, or hot-seat
-with two people on one browser. A game's address includes its id, so
+then open <http://127.0.0.1:8000>. Play against a bot, choosing the
+heuristic or the random one beside "New game vs", or hot-seat with two
+people on one browser. A game's address includes its id, so
 reloading the page or bookmarking it returns to the same game.
 
 Set a name in the box at the top. Your browser remembers it, along with a
@@ -215,9 +216,14 @@ state = GameState()
 state.valid_actions()                 # [Action('MOVE A1 A3'), ...]
 state = state.apply(Action("MOVE A1 A3"))
 state.winner                          # None until someone scores
+
+from dus_engine import Bot
+
+bot = Bot("heuristic", seed=1)        # any name the arena takes
+bot.choose(state)                     # Action('MOVE B7 B5')
 ```
 
-The browser UI plays full games against a random bot or hot-seat.
+The browser UI plays full games against either bot or hot-seat.
 
 Saved games can be listed and replayed, and two people can play online
 with an invite link.

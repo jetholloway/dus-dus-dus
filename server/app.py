@@ -13,8 +13,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .games import (
+    BOT,
     PLAYER_NAMES,
     BadInvite,
+    BotKind,
     Game,
     Mode,
     NotYourTurn,
@@ -45,6 +47,8 @@ class RevalidatingStaticFiles(StaticFiles):
 
 class NewGame(BaseModel):
     mode: Mode = Mode.HOTSEAT
+    # Which bot plays a "bot" game; ignored otherwise.
+    bot: BotKind = BotKind.HEURISTIC
     # Shown beside the seats this player takes. Not checked: players are
     # trusted to name themselves honestly.
     name: str = "Anonymous"
@@ -67,10 +71,10 @@ def create_app(db_path: Path | None = None, rng: random.Random | None = None) ->
 
     @app.post("/api/games", status_code=201)
     def create_game(body: NewGame, player: str | None = Header(None, alias="X-Player")) -> dict:
-        if player is None:
-            raise HTTPException(400, "Your browser did not say who you are")
-
-        game = Game.new(secrets.token_urlsafe(6), body.mode, player, _name(body.name), rng)
+        _check_player_id(player)
+        game = Game.new(
+            secrets.token_urlsafe(6), body.mode, player, _name(body.name), rng, body.bot
+        )
         store.insert(game)
         return game_payload(game, player)
 
@@ -80,9 +84,7 @@ def create_app(db_path: Path | None = None, rng: random.Random | None = None) ->
         body: JoinGame,
         player: str | None = Header(None, alias="X-Player"),
     ) -> dict:
-        if player is None:
-            raise HTTPException(400, "Your browser did not say who you are")
-
+        _check_player_id(player)
         game = _load(game_id)
 
         try:
@@ -196,6 +198,14 @@ def game_payload(game: Game, player_id: str | None = None) -> dict:
         "valid_actions": [str(action) for action in game.state.valid_actions()],
         "history": game.history(),
     }
+
+
+def _check_player_id(player_id: str | None) -> None:
+    """Refuse a missing id, or one that would pass for a bot's seat."""
+    if player_id is None:
+        raise HTTPException(400, "Your browser did not say who you are")
+    if player_id.startswith(BOT):
+        raise HTTPException(400, "That player id is reserved for bots")
 
 
 def _is_playing(game: Game, player_id: str | None) -> bool:

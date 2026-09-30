@@ -1,11 +1,11 @@
 import random
 
 import pytest
-from dus_engine import Action, GameRecord, GameState
+from dus_engine import Action, GameRecord, GameState, Player
 from fastapi.testclient import TestClient
 
 from server.app import create_app
-from server.games import Game, Mode
+from server.games import Game, Mode, Seat
 from server.storage import GameStore
 
 SETUP_MOVES = {f"MOVE {file}1 {file}3" for file in "ABCDEFG"}
@@ -25,8 +25,10 @@ JET = {"X-Player": "player-jet"}
 SAM = {"X-Player": "player-sam"}
 
 
-def new_game(client, mode="hotseat", name="Jet", headers=JET):
-    response = client.post("/api/games", json={"mode": mode, "name": name}, headers=headers)
+def new_game(client, mode="hotseat", name="Jet", headers=JET, **options):
+    response = client.post(
+        "/api/games", json={"mode": mode, "name": name, **options}, headers=headers
+    )
     assert response.status_code == 201
     return response.json()
 
@@ -153,11 +155,62 @@ def test_a_bot_game_can_be_played_to_the_end(client):
     assert response.json()["detail"] == "Game is over"
 
 
+@pytest.mark.parametrize("bot", ["random", "heuristic"])
+def test_either_bot_can_be_played_to_the_end(client, bot):
+    rng = random.Random(2)
+    game = new_game(client, mode="bot", bot=bot)
+    assert game["seats"]["Second"]["name"] == f"{bot.capitalize()} bot"
+
+    while game["state"]["winner"] is None:
+        response = play(client, game, rng.choice(game["valid_actions"]))
+        assert response.status_code == 200, response.json()
+        game = response.json()
+
+    assert game["version"] == len(game["history"])
+
+
+def test_the_heuristic_bot_beats_random_moves_quickly(client):
+    # Against random moves the heuristic bot wins in a handful of turns.
+    rng = random.Random(3)
+    game = new_game(client, mode="bot", bot="heuristic")
+
+    while game["state"]["winner"] is None:
+        game = play(client, game, rng.choice(game["valid_actions"])).json()
+
+    assert game["state"]["winner"] == "Second"
+    assert game["version"] < 100
+
+
+def test_an_unknown_bot_is_refused(client):
+    response = client.post(
+        "/api/games", json={"mode": "bot", "bot": "genius", "name": "Jet"}, headers=JET
+    )
+    assert response.status_code == 422
+
+
+def test_a_game_saved_with_the_original_bot_still_plays_randomly(client, db_path):
+    seats = {Player.First: Seat("player-jet", "Jet"), Player.Second: Seat("bot", "Bot")}
+    store_record(db_path, "old-bot", GameRecord(), mode=Mode.BOT, seats=seats)
+    game = client.get("/api/games/old-bot", headers=JET).json()
+
+    game = play(client, game, "MOVE D1 D3").json()
+
+    assert game["seats"]["Second"] == {"name": "Bot", "is_bot": True, "is_you": False}
+    assert [entry["player"] for entry in game["history"]] == ["First", "Second"]
+
+
+def test_a_player_id_that_looks_like_a_bot_is_refused(client):
+    response = client.post(
+        "/api/games", json={"mode": "hotseat"}, headers={"X-Player": "bot:heuristic"}
+    )
+    assert response.status_code == 400
+
+
 def test_a_game_records_who_is_playing_it(client):
     game = new_game(client, mode="bot", name="Jet")
 
     assert game["seats"]["First"] == {"name": "Jet", "is_bot": False, "is_you": True}
-    assert game["seats"]["Second"] == {"name": "Bot", "is_bot": True, "is_you": False}
+    assert game["seats"]["Second"] == {"name": "Heuristic bot", "is_bot": True, "is_you": False}
     assert game["can_play"] == ["First"]
 
     # Someone else sees the same seats, but none of them as theirs to play.

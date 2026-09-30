@@ -23,13 +23,14 @@ let greeting = "";
 const element = (id) => document.getElementById(id);
 const message = (text, isError) => setMessage(element("play-message"), text, isError);
 
-export async function startGame(mode) {
+// `bot` says which bot plays a "bot" game: "heuristic" or "random".
+export async function startGame(mode, bot) {
   try {
     const created = await api("/games", {
       method: "POST",
-      body: JSON.stringify({ mode, name: playerName() }),
+      body: JSON.stringify({ mode, bot, name: playerName() }),
     });
-    greeting = mode === "bot" ? "You are Orange. The bot plays Teal." : "";
+    greeting = mode === "bot" ? `You are Orange. ${created.seats.Second.name} plays Teal.` : "";
     location.hash = `play/${created.id}`;
   } catch (error) {
     message(error.message, true);
@@ -326,7 +327,7 @@ function renderStatus() {
   element("play-mode").textContent = `${MODES[game.mode]} — ${describeSeat("First")} vs ${describeSeat("Second")}`;
 }
 
-// "Orange (you)", "Teal (Bot)", or just "Orange" for a seat nobody has taken.
+// "Orange (you)", "Teal (Heuristic bot)", or just "Orange" for a seat nobody has taken.
 function describeSeat(side) {
   const seat = game.seats[side];
   const who = seat.is_you ? "you" : seat.name;

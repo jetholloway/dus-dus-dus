@@ -59,7 +59,9 @@ function start() {
   name.addEventListener("change", () => setPlayerName(name.value));
 
   document.getElementById("new-online").addEventListener("click", () => startGame("online"));
-  document.getElementById("new-bot").addEventListener("click", () => startGame("bot"));
+  document.getElementById("new-bot").addEventListener("click", () =>
+    startGame("bot", document.getElementById("bot-kind").value),
+  );
   document.getElementById("new-hotseat").addEventListener("click", () => startGame("hotseat"));
   setUpReplayControls();
   setUpInvite();

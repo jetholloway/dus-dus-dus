@@ -16,7 +16,13 @@
         <input id="player-name" type="text" maxlength="40" placeholder="your name" size="12">
         <a href="#">Games</a>
         <button id="new-online" type="button">New online game</button>
-        <button id="new-bot" type="button">New game vs bot</button>
+        <span class="new-bot">
+          <button id="new-bot" type="button">New game vs</button>
+          <select id="bot-kind" aria-label="Which bot to play">
+            <option value="heuristic">heuristic bot</option>
+            <option value="random">random bot</option>
+          </select>
+        </span>
         <button id="new-hotseat" type="button">New hot-seat game</button>
       </nav>
     </header>
