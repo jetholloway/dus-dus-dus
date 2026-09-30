@@ -9,7 +9,9 @@ pub use random_bot::*;
 
 use engine::{Action, GameState};
 
-pub trait Bot {
+/// `Send` so a bot can be handed between threads, as the Python bindings
+/// require.
+pub trait Bot: Send {
     fn name(&self) -> &str;
 
     /// Picks one legal action for the current player, or `None` if there is

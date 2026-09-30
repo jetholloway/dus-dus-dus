@@ -3,6 +3,7 @@ use pyo3::create_exception;
 use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
 use std::str::FromStr;
+use std::sync::{Mutex, MutexGuard};
 
 create_exception!(dus_engine, InvalidAction, PyValueError);
 
@@ -272,6 +273,47 @@ impl PyGameRecord {
     }
 }
 
+/// A computer player from the bots crate, made by name as in the arena:
+/// "random", "heuristic", or "heuristic:possession=12,..." with weights.
+/// The mutex makes it shareable between Python threads, as PyO3 requires.
+#[pyclass(name = "Bot")]
+struct PyBot(Mutex<Box<dyn bots::Bot>>);
+
+#[pymethods]
+impl PyBot {
+    #[new]
+    #[pyo3(signature = (name, seed = 0))]
+    fn new(name: &str, seed: u64) -> PyResult<Self> {
+        bots::make_bot(name, seed)
+            .map(|bot| Self(Mutex::new(bot)))
+            .map_err(PyValueError::new_err)
+    }
+
+    #[getter]
+    fn name(&self) -> String {
+        self.bot().name().to_string()
+    }
+
+    /// The bot's next action, or None if the current player has none.
+    fn choose(&self, py: Python<'_>, state: PyGameState) -> Option<PyAction> {
+        // A heuristic turn takes milliseconds; let other Python threads run.
+        py.detach(|| self.bot().choose(&state.0)).map(PyAction)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Bot('{}')", self.bot().name())
+    }
+}
+
+impl PyBot {
+    fn bot(&self) -> MutexGuard<'_, Box<dyn bots::Bot>> {
+        // A bot that panicked mid-choice holds no state worth protecting.
+        self.0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
+
 fn player_to_engine(player: PyPlayer) -> engine::Player {
     match player {
         PyPlayer::First => engine::Player::First,
@@ -286,6 +328,8 @@ fn dus_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyAction>()?;
     m.add_class::<PyGameState>()?;
     m.add_class::<PyGameRecord>()?;
+    m.add_class::<PyBot>()?;
+    m.add("BOT_NAMES", bots::BOT_NAMES.to_vec())?;
     m.add("InvalidAction", m.py().get_type::<InvalidAction>())?;
     Ok(())
 }

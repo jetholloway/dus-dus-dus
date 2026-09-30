@@ -2,7 +2,16 @@ import json
 
 import pytest
 
-from dus_engine import Action, GameRecord, GameState, InvalidAction, Player, Position
+from dus_engine import (
+    BOT_NAMES,
+    Action,
+    Bot,
+    GameRecord,
+    GameState,
+    InvalidAction,
+    Player,
+    Position,
+)
 
 
 def test_position_round_trips_through_notation():
@@ -128,3 +137,32 @@ def test_replay_rejects_a_corrupted_record():
 
     with pytest.raises(ValueError):
         corrupted.replay()
+
+
+@pytest.mark.parametrize("name", BOT_NAMES)
+def test_each_bot_chooses_a_legal_action(name):
+    bot = Bot(name, seed=1)
+    state = GameState()
+
+    for _ in range(30):
+        action = bot.choose(state)
+        assert action in state.valid_actions()
+        state = state.apply(action)
+        if state.is_terminal:
+            break
+
+    assert bot.name == name
+
+
+def test_a_bot_takes_weight_overrides_and_rejects_unknown_names():
+    assert Bot("heuristic:possession=12").name == "heuristic"
+    with pytest.raises(ValueError):
+        Bot("genius")
+
+
+def test_a_bot_has_no_action_once_the_game_is_over():
+    state, bot = GameState(), Bot("random", seed=0)
+    while not state.is_terminal:
+        state = state.apply(bot.choose(state))
+
+    assert bot.choose(state) is None
