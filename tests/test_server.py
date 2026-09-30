@@ -26,6 +26,8 @@ SAM = {"X-Player": "player-sam"}
 
 
 def new_game(client, mode="hotseat", name="Jet", headers=JET, **options):
+    if mode == "bot":
+        options.setdefault("side", "First")  # most tests play Orange
     response = client.post(
         "/api/games", json={"mode": mode, "name": name, **options}, headers=headers
     )
@@ -179,6 +181,37 @@ def test_the_heuristic_bot_beats_random_moves_quickly(client):
 
     assert game["state"]["winner"] == "Second"
     assert game["version"] < 100
+
+
+def test_playing_teal_the_bot_opens_as_orange(client):
+    game = new_game(client, mode="bot", side="Second")
+
+    assert game["can_play"] == ["Second"]
+    assert game["seats"]["First"]["is_bot"] is True
+    assert game["seats"]["Second"]["is_you"] is True
+    assert [entry["player"] for entry in game["history"]] == ["First"]
+    assert game["state"]["current_player"] == "Second"
+
+    game = play(client, game, game["valid_actions"][0]).json()
+
+    # The setup is over: the bot has replied with a full turn of three.
+    assert [entry["player"] for entry in game["history"]] == ["First", "Second"] + ["First"] * 3
+    assert game["state"]["current_player"] == "Second"
+
+
+def test_a_random_side_gives_each_side_sometimes(client):
+    sides = {
+        new_game(client, mode="bot", side="random")["can_play"][0] for _ in range(20)
+    }
+    assert sides == {"First", "Second"}
+
+
+def test_the_side_defaults_to_random(client):
+    sides = {
+        client.post("/api/games", json={"mode": "bot"}, headers=JET).json()["can_play"][0]
+        for _ in range(20)
+    }
+    assert sides == {"First", "Second"}
 
 
 def test_an_unknown_bot_is_refused(client):

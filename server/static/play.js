@@ -23,18 +23,27 @@ let greeting = "";
 const element = (id) => document.getElementById(id);
 const message = (text, isError) => setMessage(element("play-message"), text, isError);
 
-// `bot` says which bot plays a "bot" game: "heuristic" or "random".
-export async function startGame(mode, bot) {
+// For a "bot" game, `options` says which bot ("heuristic" or "random") and
+// which side the player takes ("First", "Second" or "random").
+export async function startGame(mode, options = {}) {
   try {
     const created = await api("/games", {
       method: "POST",
-      body: JSON.stringify({ mode, bot, name: playerName() }),
+      body: JSON.stringify({ mode, ...options, name: playerName() }),
     });
-    greeting = mode === "bot" ? `You are Orange. ${created.seats.Second.name} plays Teal.` : "";
+    greeting = mode === "bot" ? botGreeting(created.seats) : "";
     location.hash = `play/${created.id}`;
   } catch (error) {
     message(error.message, true);
   }
+}
+
+// "You are Teal. Heuristic bot plays Orange, and has made its opening move."
+function botGreeting(seats) {
+  const yours = Object.keys(seats).find((side) => seats[side].is_you);
+  const bots = Object.keys(seats).find((side) => seats[side].is_bot);
+  const opened = bots === "First" ? ", and has made its opening move" : "";
+  return `You are ${NAMES[yours]}. ${seats[bots].name} plays ${NAMES[bots]}${opened}.`;
 }
 
 // Accepts an invitation, then opens the game to play.

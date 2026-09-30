@@ -60,7 +60,10 @@ function start() {
 
   document.getElementById("new-online").addEventListener("click", () => startGame("online"));
   document.getElementById("new-bot").addEventListener("click", () =>
-    startGame("bot", document.getElementById("bot-kind").value),
+    startGame("bot", {
+      bot: document.getElementById("bot-kind").value,
+      side: document.getElementById("bot-side").value,
+    }),
   );
   document.getElementById("new-hotseat").addEventListener("click", () => startGame("hotseat"));
   setUpReplayControls();

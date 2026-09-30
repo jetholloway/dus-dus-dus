@@ -71,6 +71,11 @@ nav button {
   align-items: stretch;
 }
 
+.new-bot label {
+  align-self: center;
+  margin: 0 0.4rem;
+}
+
 .new-bot select {
   padding: 0.4rem 0.4rem;
   font: inherit;

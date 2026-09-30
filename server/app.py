@@ -23,6 +23,7 @@ from .games import (
     ReplayFailure,
     Seat,
     SeatTaken,
+    Side,
     UnreplayableGame,
     history_of,
     replay,
@@ -49,6 +50,8 @@ class NewGame(BaseModel):
     mode: Mode = Mode.HOTSEAT
     # Which bot plays a "bot" game; ignored otherwise.
     bot: BotKind = BotKind.HEURISTIC
+    # The side the player takes against a bot: "First", "Second" or "random".
+    side: Side = Side.RANDOM
     # Shown beside the seats this player takes. Not checked: players are
     # trusted to name themselves honestly.
     name: str = "Anonymous"
@@ -73,8 +76,9 @@ def create_app(db_path: Path | None = None, rng: random.Random | None = None) ->
     def create_game(body: NewGame, player: str | None = Header(None, alias="X-Player")) -> dict:
         _check_player_id(player)
         game = Game.new(
-            secrets.token_urlsafe(6), body.mode, player, _name(body.name), rng, body.bot
+            secrets.token_urlsafe(6), body.mode, player, _name(body.name), rng, body.bot, body.side
         )
+        game.play_bot(rng)
         store.insert(game)
         return game_payload(game, player)
 

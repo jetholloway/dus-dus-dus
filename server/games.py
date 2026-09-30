@@ -25,6 +25,14 @@ class BotKind(str, Enum):
 BOT_NAMES = {BotKind.RANDOM: "Random bot", BotKind.HEURISTIC: "Heuristic bot"}
 
 
+class Side(str, Enum):
+    """The side a player asks to take against a bot."""
+
+    FIRST = "First"
+    SECOND = "Second"
+    RANDOM = "random"
+
+
 class Mode(str, Enum):
     HOTSEAT = "hotseat"
     BOT = "bot"
@@ -152,21 +160,30 @@ class Game:
         player_name: str,
         rng: random.Random | None = None,
         bot: BotKind = BotKind.HEURISTIC,
+        side: Side = Side.RANDOM,
     ) -> "Game":
         """A new game, with its seats given to whoever asked for it.
 
         In hot-seat both seats are theirs, since one browser plays both sides.
-        Against a bot they take Orange and the bot takes Teal. Online they
-        take one side at random and the other waits for a friend to join.
+        Against a bot they take the side they asked for, or one at random,
+        and the bot takes the other; if the bot is Orange, call play_bot so
+        it makes the opening move. Online they take one side at random and
+        the other waits for a friend to join.
         """
+        rng = rng or random.Random()
         player = Seat(player_id, player_name)
         seats = {Player.First: player, Player.Second: player}
         invite = None
 
         if mode is Mode.BOT:
-            seats[Player.Second] = Seat.for_bot(bot)
+            if side is Side.RANDOM:
+                theirs = rng.choice(list(PLAYER_NAMES))
+            else:
+                theirs = PLAYERS[side.value]
+            bots = Player.Second if theirs is Player.First else Player.First
+            seats[bots] = Seat.for_bot(bot)
         elif mode is Mode.ONLINE:
-            theirs = (rng or random.Random()).choice(list(PLAYER_NAMES))
+            theirs = rng.choice(list(PLAYER_NAMES))
             seats[theirs] = Seat()
             invite = secrets.token_urlsafe(8)
 
@@ -269,7 +286,10 @@ class Game:
                 raise NotYourTurn(f"It's {seat.name or 'the other player'}'s turn")
 
         self._apply(Action(notation))
+        self.play_bot(rng)
 
+    def play_bot(self, rng: random.Random) -> None:
+        """Let the bot move for as long as it's its turn."""
         if not self.is_bot_turn():
             return
 
