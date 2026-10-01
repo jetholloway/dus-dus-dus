@@ -121,11 +121,11 @@ def create_app(db_path: Path | None = None, rng: random.Random | None = None) ->
         return {"version": version, "updated_at": updated_at}
 
     @app.get("/api/games/{game_id}/replay")
-    def get_replay(game_id: str) -> dict:
+    def get_replay(game_id: str, player: str | None = Header(None, alias="X-Player")) -> dict:
         stored = store.load_record(game_id)
         if stored is None:
             raise HTTPException(404, "No such game")
-        return replay_payload(stored)
+        return replay_payload(stored, player)
 
     @app.post("/api/games/{game_id}/actions")
     def play_action(
@@ -255,7 +255,7 @@ def summary_payload(stored: StoredGame) -> dict:
     }
 
 
-def replay_payload(stored: StoredGame) -> dict:
+def replay_payload(stored: StoredGame, player_id: str | None = None) -> dict:
     """Every position of a game, for stepping through it.
 
     Frame 0 is the start; frame n is the position after move n. A game the
@@ -266,7 +266,8 @@ def replay_payload(stored: StoredGame) -> dict:
     return {
         "id": stored.id,
         "mode": stored.mode.value,
-        "seats": seats_payload(stored.seats),
+        # Says which seat is the viewer's, so their replay is drawn from their side.
+        "seats": seats_payload(stored.seats, player_id),
         "frames": [state_payload(state) for state in states],
         "history": history_of(states, stored.record),
         "failure": _failure_payload(failure),

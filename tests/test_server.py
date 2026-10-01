@@ -493,6 +493,16 @@ def test_the_list_says_how_each_game_stands(client, db_path):
     assert summaries["legacy"]["problem"] == "Move 1 (MOVE A1 A2) is not allowed: Path too short"
 
 
+def test_a_replay_says_which_seat_is_the_viewers(client):
+    game = new_game(client, mode="bot", side="Second")
+
+    mine = client.get(f"/api/games/{game['id']}/replay", headers=JET).json()
+    theirs = client.get(f"/api/games/{game['id']}/replay", headers=SAM).json()
+
+    assert mine["seats"]["Second"]["is_you"] is True
+    assert theirs["seats"]["Second"]["is_you"] is False
+
+
 def test_a_replay_has_a_frame_for_every_move(client):
     game = new_game(client, mode="bot")
     game = play(client, game, "MOVE D1 D3").json()

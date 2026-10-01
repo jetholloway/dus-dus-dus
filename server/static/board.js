@@ -7,7 +7,8 @@ const SVG = "http://www.w3.org/2000/svg";
 
 // Draws `state` into `container`. With `onSquare`, each square is a button
 // that calls it with the square's name, such as "D3". `arrows` come from
-// turns.js and show recent actions.
+// turns.js and show recent actions. `flipped` turns the board half round, so
+// Teal's back rank is at the bottom, for whoever plays Teal.
 export function drawBoard(
   container,
   state,
@@ -17,14 +18,17 @@ export function drawBoard(
     targets = new Map(),
     movable = new Set(),
     arrows = [],
+    flipped = false,
   } = {},
 ) {
   container.replaceChildren();
+  const ranks = flipped ? [1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1];
+  const files = flipped ? [...FILES].reverse() : [...FILES];
 
-  for (let rank = 7; rank >= 1; rank--) {
+  for (const rank of ranks) {
     container.append(label(rank, "rank"));
 
-    for (const file of FILES) {
+    for (const file of files) {
       const square = `${file}${rank}`;
       const owner = state.pieces[square];
       const cell = document.createElement(onSquare ? "button" : "div");
@@ -56,20 +60,27 @@ export function drawBoard(
   }
 
   container.append(label("", "file"));
-  for (const file of FILES) {
+  for (const file of files) {
     container.append(label(file, "file"));
   }
 
   if (arrows.length > 0) {
-    container.append(drawArrows(container.id, arrows));
+    container.append(drawArrows(container.id, arrows, flipped));
   }
+}
+
+// Whether to draw a game flipped: when the viewer plays Teal and only Teal.
+// Hot-seat players, who play both sides, and spectators see it unflipped.
+export function viewerIsTeal(seats) {
+  const mine = Object.keys(seats).filter((side) => seats[side].is_you);
+  return mine.length === 1 && mine[0] === "Second";
 }
 
 // Arrows: a drawing laid exactly over the 7x7 squares, in units of one square,
 // so it lines up however large the board is drawn. It ignores the mouse, so
 // clicks reach the squares beneath. The move list says the same in words, so
 // screen readers skip it.
-function drawArrows(boardId, arrows) {
+function drawArrows(boardId, arrows, flipped) {
   const svg = svgElement("svg", { class: "arrows", viewBox: "0 0 7 7", "aria-hidden": "true" });
   const defs = svgElement("defs");
 
@@ -92,15 +103,15 @@ function drawArrows(boardId, arrows) {
   svg.append(defs);
 
   for (const arrow of arrows) {
-    svg.append(drawArrow(boardId, arrow));
+    svg.append(drawArrow(boardId, arrow, flipped));
   }
 
   return svg;
 }
 
-function drawArrow(boardId, { kind, from, to, side, label, faint }) {
-  const [x1, y1] = centre(from);
-  const [x2, y2] = centre(to);
+function drawArrow(boardId, { kind, from, to, side, label, faint }, flipped) {
+  const [x1, y1] = centre(from, flipped);
+  const [x2, y2] = centre(to, flipped);
 
   // End at the edge of the piece rather than its centre, so the arrow shows up
   // against the board instead of vanishing over a piece of the same colour. A
@@ -147,11 +158,12 @@ function drawArrow(boardId, { kind, from, to, side, label, faint }) {
   return group;
 }
 
-// The centre of a square such as "D3", in square units from the top left.
-function centre(square) {
+// The centre of a square such as "D3", in square units from the top left of
+// the board as drawn.
+function centre(square, flipped) {
   const file = FILES.indexOf(square[0]);
   const rank = Number(square.slice(1));
-  return [file + 0.5, 7 - rank + 0.5];
+  return flipped ? [6 - file + 0.5, rank - 1 + 0.5] : [file + 0.5, 7 - rank + 0.5];
 }
 
 function svgElement(name, attributes = {}) {

@@ -5,7 +5,7 @@
 // so it never needs to know the rules.
 
 import { MODES, NAMES, api, playerName, setMessage } from "./api.js";
-import { drawBoard } from "./board.js";
+import { drawBoard, viewerIsTeal } from "./board.js";
 import { playArrows } from "./turns.js";
 
 // How often to ask the server whether an unfinished game has changed.
@@ -359,6 +359,7 @@ function renderBoard() {
     targets: targetSquares(actions),
     movable: selected === null ? new Set(actions.map((action) => action.src)) : new Set(),
     arrows: playArrows(game),
+    flipped: viewerIsTeal(game.seats),
   });
 }
 

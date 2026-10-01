@@ -4,7 +4,7 @@
 // instant and needs no further requests.
 
 import { MODES, NAMES, api, setMessage } from "./api.js";
-import { drawBoard } from "./board.js";
+import { drawBoard, viewerIsTeal } from "./board.js";
 import { replayArrows } from "./turns.js";
 
 const AUTOPLAY_DELAY_MS = 700;
@@ -128,7 +128,10 @@ function render() {
   const state = replay.frames[frame];
   const move = frame > 0 ? replay.history[frame - 1] : null;
 
-  drawBoard(board, state, { arrows: replayArrows(replay.history, frame) });
+  drawBoard(board, state, {
+    arrows: replayArrows(replay.history, frame),
+    flipped: viewerIsTeal(replay.seats),
+  });
 
   const slider = element("replay-slider");
   slider.max = lastFrame();

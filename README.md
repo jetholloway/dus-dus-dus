@@ -164,8 +164,9 @@ just serve
 then open <http://127.0.0.1:8000>. Play against a bot, choosing the
 heuristic or the random one beside "New game vs" and whether you play
 Orange, Teal or a side at random (the default); as Teal, the bot has
-already made Orange's opening move. Or play hot-seat with two people on
-one browser. A game's address includes its id, so
+already made Orange's opening move. Whenever you play Teal, here or
+online, the board and its replay are turned round so your side is at the
+bottom. Or play hot-seat with two people on one browser. A game's address includes its id, so
 reloading the page or bookmarking it returns to the same game.
 
 Set a name in the box at the top. Your browser remembers it, along with a
