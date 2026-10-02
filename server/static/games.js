@@ -54,9 +54,23 @@ function resultCell(game) {
     return td;
   }
   if (game.status === "finished") {
-    return cell(`${NAMES[game.winner]} won`);
+    return cell(`${winnerName(game)} won`);
   }
   return cell("In progress");
+}
+
+// The winner's name, such as "Jet". The colour stands in for a seat with no
+// name, from before seats were recorded, and is added when one person played
+// both sides, as in hot-seat: "Jet (Orange)".
+function winnerName(game) {
+  const colour = NAMES[game.winner];
+  const name = game.seats[game.winner].name;
+  const loser = game.seats[game.winner === "First" ? "Second" : "First"].name;
+
+  if (!name) {
+    return colour;
+  }
+  return name === loser ? `${name} (${colour})` : name;
 }
 
 function linksCell(game) {
