@@ -59,9 +59,17 @@ function start() {
   name.addEventListener("change", () => setPlayerName(name.value));
 
   document.getElementById("new-online").addEventListener("click", () => startGame("online"));
+  const botKind = document.getElementById("bot-kind");
+  const botStrength = document.getElementById("bot-strength");
+  // Only the heuristic bot has a strength to choose.
+  const showStrength = () => (botStrength.hidden = botKind.value !== "heuristic");
+  botKind.addEventListener("change", showStrength);
+  showStrength();
+
   document.getElementById("new-bot").addEventListener("click", () =>
     startGame("bot", {
-      bot: document.getElementById("bot-kind").value,
+      bot: botKind.value,
+      strength: Number(botStrength.value),
       side: document.getElementById("bot-side").value,
     }),
   );

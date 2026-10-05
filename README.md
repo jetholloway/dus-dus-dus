@@ -172,7 +172,9 @@ just serve
 ```
 
 then open <http://127.0.0.1:8000>. Play against a bot, choosing the
-heuristic or the random one beside "New game vs" and whether you play
+heuristic or the random one beside "New game vs", the heuristic bot's
+strength from 1 to 7 (how many of its pieces it notices each turn; see
+[Bots](#bots)), and whether you play
 Orange, Teal or a side at random (the default); as Teal, the bot has
 already made Orange's opening move. Whenever you play Teal, here or
 online, the board and its replay are turned round so your side is at the

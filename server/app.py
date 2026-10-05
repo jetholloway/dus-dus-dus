@@ -10,12 +10,13 @@ from pathlib import Path
 from dus_engine import GameState, Player, Position
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .games import (
     BOT,
     PLAYER_NAMES,
     BadInvite,
+    MAX_STRENGTH,
     BotKind,
     Game,
     Mode,
@@ -52,6 +53,8 @@ class NewGame(BaseModel):
     bot: BotKind = BotKind.HEURISTIC
     # The side the player takes against a bot: "First", "Second" or "random".
     side: Side = Side.RANDOM
+    # The heuristic bot's strength: how many of its pieces it notices a turn.
+    strength: int = Field(MAX_STRENGTH, ge=1, le=MAX_STRENGTH)
     # Shown beside the seats this player takes. Not checked: players are
     # trusted to name themselves honestly.
     name: str = "Anonymous"
@@ -76,7 +79,14 @@ def create_app(db_path: Path | None = None, rng: random.Random | None = None) ->
     def create_game(body: NewGame, player: str | None = Header(None, alias="X-Player")) -> dict:
         _check_player_id(player)
         game = Game.new(
-            secrets.token_urlsafe(6), body.mode, player, _name(body.name), rng, body.bot, body.side
+            secrets.token_urlsafe(6),
+            body.mode,
+            player,
+            _name(body.name),
+            rng,
+            body.bot,
+            body.side,
+            body.strength,
         )
         game.play_bot(rng)
         store.insert(game)

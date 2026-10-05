@@ -10,11 +10,15 @@ from dus_engine import Action, Bot, GameRecord, GameState, InvalidAction, Player
 PLAYER_NAMES = {Player.First: "First", Player.Second: "Second"}
 PLAYERS = {name: player for player, name in PLAYER_NAMES.items()}
 
-# The owner recorded for a bot's seat is "bot:" and which bot, e.g.
-# "bot:heuristic". Games saved before there was a choice of bots have plain
-# "bot", which was the random bot.
+# The owner recorded for a bot's seat is "bot:" and the bot as the engine's
+# Bot() names it, e.g. "bot:heuristic:pieces=5". Games saved before there was
+# a choice of bots have plain "bot", which was the random bot.
 BOT = "bot"
 BOT_PREFIX = "bot:"
+
+# How many of its 7 pieces the heuristic bot notices each turn; fewer is
+# weaker. 7 is its full strength.
+MAX_STRENGTH = 7
 
 
 class BotKind(str, Enum):
@@ -71,21 +75,26 @@ class Seat:
     name: str | None = None
 
     @classmethod
-    def for_bot(cls, kind: BotKind) -> "Seat":
-        return cls(BOT_PREFIX + kind.value, BOT_NAMES[kind])
+    def for_bot(cls, kind: BotKind, strength: int = MAX_STRENGTH) -> "Seat":
+        if kind is BotKind.HEURISTIC:
+            spec = f"{kind.value}:pieces={strength}"
+            name = f"{BOT_NAMES[kind]} {strength}/{MAX_STRENGTH}"
+        else:
+            spec, name = kind.value, BOT_NAMES[kind]
+        return cls(BOT_PREFIX + spec, name)
 
     @property
     def is_bot(self) -> bool:
         return self.owner is not None and (self.owner == BOT or self.owner.startswith(BOT_PREFIX))
 
     @property
-    def bot_kind(self) -> BotKind | None:
-        """Which bot plays this seat, or None for a person's."""
+    def bot(self) -> str | None:
+        """The bot that plays this seat, as Bot() takes it, or None for a person's."""
         if not self.is_bot:
             return None
         if self.owner == BOT:
-            return BotKind.RANDOM
-        return BotKind(self.owner.removeprefix(BOT_PREFIX))
+            return BotKind.RANDOM.value
+        return self.owner.removeprefix(BOT_PREFIX)
 
     def belongs_to(self, player_id: str | None) -> bool:
         return self.owner is not None and self.owner == player_id
@@ -161,6 +170,7 @@ class Game:
         rng: random.Random | None = None,
         bot: BotKind = BotKind.HEURISTIC,
         side: Side = Side.RANDOM,
+        strength: int = MAX_STRENGTH,
     ) -> "Game":
         """A new game, with its seats given to whoever asked for it.
 
@@ -181,7 +191,7 @@ class Game:
             else:
                 theirs = PLAYERS[side.value]
             bots = Player.Second if theirs is Player.First else Player.First
-            seats[bots] = Seat.for_bot(bot)
+            seats[bots] = Seat.for_bot(bot, strength)
         elif mode is Mode.ONLINE:
             theirs = rng.choice(list(PLAYER_NAMES))
             seats[theirs] = Seat()
@@ -293,7 +303,7 @@ class Game:
         if not self.is_bot_turn():
             return
 
-        bot = Bot(self.seat(self.state.current_player).bot_kind.value, rng.getrandbits(64))
+        bot = Bot(self.seat(self.state.current_player).bot, rng.getrandbits(64))
         while self.is_bot_turn():
             action = bot.choose(self.state)
             if action is None:

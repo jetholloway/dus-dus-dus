@@ -161,7 +161,7 @@ def test_a_bot_game_can_be_played_to_the_end(client):
 def test_either_bot_can_be_played_to_the_end(client, bot):
     rng = random.Random(2)
     game = new_game(client, mode="bot", bot=bot)
-    assert game["seats"]["Second"]["name"] == f"{bot.capitalize()} bot"
+    assert game["seats"]["Second"]["name"].startswith(f"{bot.capitalize()} bot")
 
     while game["state"]["winner"] is None:
         response = play(client, game, rng.choice(game["valid_actions"]))
@@ -214,6 +214,40 @@ def test_the_side_defaults_to_random(client):
     assert sides == {"First", "Second"}
 
 
+@pytest.mark.parametrize("strength", [1, 4])
+def test_a_weakened_bot_is_named_and_plays_to_the_end(client, strength):
+    rng = random.Random(strength)
+    game = new_game(client, mode="bot", strength=strength)
+    assert game["seats"]["Second"]["name"] == f"Heuristic bot {strength}/7"
+
+    while game["state"]["winner"] is None:
+        response = play(client, game, rng.choice(game["valid_actions"]))
+        assert response.status_code == 200, response.json()
+        game = response.json()
+
+
+@pytest.mark.parametrize("strength", [0, 8])
+def test_a_strength_out_of_range_is_refused(client, strength):
+    response = client.post(
+        "/api/games", json={"mode": "bot", "strength": strength, "name": "Jet"}, headers=JET
+    )
+    assert response.status_code == 422
+
+
+def test_a_game_saved_before_strengths_plays_at_full_strength(client, db_path):
+    seats = {
+        Player.First: Seat("player-jet", "Jet"),
+        Player.Second: Seat("bot:heuristic", "Heuristic bot"),
+    }
+    store_record(db_path, "unrated", GameRecord(), mode=Mode.BOT, seats=seats)
+    game = client.get("/api/games/unrated", headers=JET).json()
+
+    game = play(client, game, "MOVE D1 D3").json()
+
+    assert game["seats"]["Second"]["name"] == "Heuristic bot"
+    assert [entry["player"] for entry in game["history"]] == ["First", "Second"]
+
+
 def test_an_unknown_bot_is_refused(client):
     response = client.post(
         "/api/games", json={"mode": "bot", "bot": "genius", "name": "Jet"}, headers=JET
@@ -243,7 +277,11 @@ def test_a_game_records_who_is_playing_it(client):
     game = new_game(client, mode="bot", name="Jet")
 
     assert game["seats"]["First"] == {"name": "Jet", "is_bot": False, "is_you": True}
-    assert game["seats"]["Second"] == {"name": "Heuristic bot", "is_bot": True, "is_you": False}
+    assert game["seats"]["Second"] == {
+        "name": "Heuristic bot 7/7",
+        "is_bot": True,
+        "is_you": False,
+    }
     assert game["can_play"] == ["First"]
 
     # Someone else sees the same seats, but none of them as theirs to play.

@@ -23,8 +23,9 @@ let greeting = "";
 const element = (id) => document.getElementById(id);
 const message = (text, isError) => setMessage(element("play-message"), text, isError);
 
-// For a "bot" game, `options` says which bot ("heuristic" or "random") and
-// which side the player takes ("First", "Second" or "random").
+// For a "bot" game, `options` says which bot ("heuristic" or "random"), the
+// heuristic bot's strength (1 to 7), and which side the player takes
+// ("First", "Second" or "random").
 export async function startGame(mode, options = {}) {
   try {
     const created = await api("/games", {
