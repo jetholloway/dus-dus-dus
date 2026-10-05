@@ -1,4 +1,4 @@
-use engine::{Action, GameState, Player, Position, Space};
+use engine::{Action, ActionType, GameState, Player, Position, Space, Transition};
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
@@ -137,33 +137,119 @@ impl Weights {
     }
 }
 
+/// Every piece a player has; none is ever captured.
+pub const PIECES: usize = 7;
+
 /// Plans the rest of its turn by trying every sequence of actions that
 /// finishes it, then plays the first action of the best-scoring sequence.
-/// It plans afresh on each call, so it keeps no memory between actions.
 /// Ties are broken at random from its seed.
+///
+/// To play weaker, it notices only `pieces` of its seven at random each
+/// turn, and plans as if the others weren't there: it neither acts with
+/// them nor passes to them. If none of the pieces it noticed can act, it
+/// notices one more at random, as often as it takes.
 pub struct HeuristicBot {
     weights: Weights,
+    pieces: usize,
     rng: StdRng,
+    /// The pieces noticed this turn, followed as they move. It plans afresh
+    /// for each action, so this is what keeps a turn's choice consistent.
+    turn: Option<TurnMemory>,
+}
+
+struct TurnMemory {
+    turn_count: u32,
+    player: Player,
+    noticed: Noticed,
 }
 
 impl HeuristicBot {
-    pub fn new(weights: Weights, seed: u64) -> Self {
+    pub fn new(weights: Weights, pieces: usize, seed: u64) -> Self {
         Self {
             weights,
+            pieces: pieces.clamp(1, PIECES),
             rng: StdRng::seed_from_u64(seed),
+            turn: None,
         }
     }
 
+    /// A bot from options like `pieces=5,possession=12`: how many pieces it
+    /// notices (1 to 7, default 7), then any weights to override.
+    pub fn from_options(options: &str, seed: u64) -> Result<Self, String> {
+        let mut pieces = PIECES;
+        let mut weights = Vec::new();
+
+        for pair in options.split(',').filter(|pair| !pair.trim().is_empty()) {
+            match pair.split_once('=') {
+                Some((name, value)) if name.trim() == "pieces" => {
+                    pieces = value
+                        .trim()
+                        .parse()
+                        .ok()
+                        .filter(|pieces| (1..=PIECES).contains(pieces))
+                        .ok_or_else(|| format!("pieces expects 1 to {PIECES}, got {value:?}"))?;
+                }
+                _ => weights.push(pair),
+            }
+        }
+
+        Ok(Self::new(
+            Weights::with_overrides(&weights.join(","))?,
+            pieces,
+            seed,
+        ))
+    }
+
+    /// The pieces to plan with this turn: those noticed at its start, or a
+    /// fresh random choice when a new turn begins, plus more at random if
+    /// none of them can act.
+    fn noticed(&mut self, state: &GameState) -> Noticed {
+        let player = state.current_player();
+        let own: Vec<Position> = positions()
+            .filter(|&position| state.space(position) == Space::Piece(player))
+            .collect();
+
+        let mut noticed = match &self.turn {
+            Some(turn)
+                if turn.turn_count == state.turn_count()
+                    && turn.player == player
+                    && turn.noticed.all_on(&own) =>
+            {
+                turn.noticed
+            }
+            _ => {
+                let chosen = own.choose_multiple(&mut self.rng, self.pieces.min(own.len()));
+                Noticed::of(chosen.copied())
+            }
+        };
+
+        let actions = state.valid_actions();
+        while !actions.iter().any(|action| noticed.allows(action)) {
+            let unnoticed: Vec<Position> = own
+                .iter()
+                .copied()
+                .filter(|&square| !noticed.contains(square))
+                .collect();
+            let Some(&extra) = unnoticed.choose(&mut self.rng) else {
+                break;
+            };
+            noticed = Noticed(noticed.0 | Noticed::bit(extra));
+        }
+
+        noticed
+    }
+
     /// The best score reachable by the end of `player`'s turn from `state`.
-    fn best_score(&self, state: &GameState, player: Player) -> f64 {
+    fn best_score(&self, state: &GameState, player: Player, noticed: Noticed) -> f64 {
         if state.is_terminal() || state.current_player() != player {
             return self.weights.score(state, player);
         }
 
-        state
-            .valid_transitions()
+        options(state, noticed)
             .iter()
-            .map(|transition| self.best_score(&transition.state, player))
+            .map(|transition| {
+                self.best_score(&transition.state, player, noticed.after(&transition.action))
+            })
             .fold(f64::NEG_INFINITY, f64::max)
     }
 }
@@ -175,11 +261,13 @@ impl Bot for HeuristicBot {
 
     fn choose(&mut self, state: &GameState) -> Option<Action> {
         let player = state.current_player();
+        let noticed = self.noticed(state);
         let mut best = Vec::new();
         let mut best_score = f64::NEG_INFINITY;
 
-        for transition in state.valid_transitions() {
-            let score = self.best_score(&transition.state, player);
+        for transition in options(state, noticed) {
+            let score =
+                self.best_score(&transition.state, player, noticed.after(&transition.action));
             if score > best_score || best.is_empty() {
                 best_score = score;
                 best.clear();
@@ -189,7 +277,72 @@ impl Bot for HeuristicBot {
             }
         }
 
-        best.choose(&mut self.rng).cloned()
+        let action = best.choose(&mut self.rng).cloned()?;
+        self.turn = Some(TurnMemory {
+            turn_count: state.turn_count(),
+            player,
+            noticed: noticed.after(&action),
+        });
+        Some(action)
+    }
+}
+
+/// The transitions the bot considers: those using only noticed pieces, or
+/// every one if the noticed pieces can't act. `noticed` makes sure they can
+/// at the bot's actual position, so this only falls back to all of them
+/// while planning further into the turn.
+fn options(state: &GameState, noticed: Noticed) -> Vec<Transition> {
+    let all = state.valid_transitions();
+    let seen: Vec<Transition> = all
+        .iter()
+        .filter(|transition| noticed.allows(&transition.action))
+        .cloned()
+        .collect();
+
+    if seen.is_empty() {
+        all
+    } else {
+        seen
+    }
+}
+
+/// A set of squares holding the pieces a bot has noticed, one bit each.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Noticed(u64);
+
+impl Noticed {
+    fn of(squares: impl Iterator<Item = Position>) -> Self {
+        Self(squares.fold(0, |bits, square| bits | Self::bit(square)))
+    }
+
+    fn bit(square: Position) -> u64 {
+        1 << (square.y * 7 + square.x)
+    }
+
+    fn contains(self, square: Position) -> bool {
+        self.0 & Self::bit(square) != 0
+    }
+
+    /// Whether every noticed square is one of `squares`.
+    fn all_on(self, squares: &[Position]) -> bool {
+        self.0 & !Self::of(squares.iter().copied()).0 == 0
+    }
+
+    /// Whether an action uses only noticed pieces: the one acting and, for
+    /// a pass, the one receiving.
+    fn allows(self, action: &Action) -> bool {
+        self.contains(action.src())
+            && (action.action_type() != ActionType::Pass || self.contains(action.dst()))
+    }
+
+    /// The set after `action`, following a noticed piece that moves.
+    fn after(self, action: &Action) -> Self {
+        let moves = action.action_type() != ActionType::Pass;
+        if moves && self.contains(action.src()) {
+            Self(self.0 & !Self::bit(action.src()) | Self::bit(action.dst()))
+        } else {
+            self
+        }
     }
 }
 
@@ -327,7 +480,7 @@ mod tests {
 
     #[test]
     fn takes_a_win_whenever_one_is_available() {
-        let mut bot = HeuristicBot::new(Weights::default(), 0);
+        let mut bot = HeuristicBot::new(Weights::default(), PIECES, 0);
         let mut chances = 0;
 
         for state in turn_starts(4).into_iter().step_by(4) {
@@ -347,8 +500,81 @@ mod tests {
     }
 
     #[test]
+    fn noticing_one_piece_misses_many_wins_the_full_bot_takes() {
+        let mut missed = 0;
+        let mut chances = 0;
+
+        for state in turn_starts(4).into_iter().step_by(4) {
+            if chances == 10 {
+                break;
+            }
+            if can_win_this_turn(&state) {
+                chances += 1;
+                let mut bot = HeuristicBot::new(Weights::default(), 1, chances);
+                if !play_turn(&mut bot, state) {
+                    missed += 1;
+                }
+            }
+        }
+
+        assert!(missed >= 3, "missed only {missed} of {chances} wins");
+    }
+
+    #[test]
+    fn a_weakened_bot_plays_legal_games_to_the_end() {
+        for pieces in [1, 4] {
+            let mut bot = HeuristicBot::new(Weights::default(), pieces, pieces as u64);
+            let mut opponent = RandomBot::new(0);
+            let mut state = GameState::new();
+
+            for _ in 0..1000 {
+                let action = match state.current_player() {
+                    Player::First => bot.choose(&state),
+                    Player::Second => opponent.choose(&state),
+                }
+                .expect("a legal action");
+                match apply(&state, &action) {
+                    Some(next) => state = next,
+                    None => break,
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn noticed_pieces_are_followed_as_they_move() {
+        let a1 = Position { x: 0, y: 0 };
+        let a3 = Position { x: 0, y: 2 };
+        let b1 = Position { x: 1, y: 0 };
+        let noticed = Noticed::of([a1].into_iter());
+
+        assert!(noticed.allows(&Action::new_move(a1, a3)));
+        assert!(!noticed.allows(&Action::new_move(b1, Position { x: 1, y: 2 })));
+        assert!(!noticed.allows(&Action::new_pass(a1, b1)));
+
+        let moved = noticed.after(&Action::new_move(a1, a3));
+        assert!(moved.contains(a3) && !moved.contains(a1));
+        // A pass moves no piece, and an unnoticed piece moving changes nothing.
+        assert_eq!(moved.after(&Action::new_pass(a3, b1)), moved);
+        assert_eq!(
+            moved.after(&Action::new_move(b1, Position { x: 1, y: 2 })),
+            moved
+        );
+    }
+
+    #[test]
+    fn pieces_option_is_checked() {
+        assert_eq!(HeuristicBot::from_options("pieces=3", 0).unwrap().pieces, 3);
+        assert_eq!(HeuristicBot::from_options("", 0).unwrap().pieces, PIECES);
+        assert!(HeuristicBot::from_options("pieces=3,possession=1", 0).is_ok());
+        for bad in ["pieces=0", "pieces=8", "pieces=lots", "luck=3"] {
+            assert!(HeuristicBot::from_options(bad, 0).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
     fn opening_is_a_legal_setup_move() {
-        let mut bot = HeuristicBot::new(Weights::default(), 0);
+        let mut bot = HeuristicBot::new(Weights::default(), PIECES, 0);
         let state = GameState::new();
         let action = bot.choose(&state).expect("a legal action");
         assert!(state.valid_actions().contains(&action));

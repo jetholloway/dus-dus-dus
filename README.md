@@ -135,6 +135,16 @@ that picks one action at a time. There are two:
   Override any of them after a colon to try new values without
   recompiling, e.g. `heuristic:possession=12,open_lane=30`.
 
+  `heuristic:pieces=N` weakens it: each turn it notices only N of its 7
+  pieces at random and plans with those alone, so it can miss a win that
+  needs a piece it overlooked. If none of them can act it notices one more.
+  Over 1000 games each, against the full bot (`pieces=7`):
+
+  | `pieces` | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+  | --- | --- | --- | --- | --- | --- | --- | --- |
+  | wins vs full bot | 0.2% | 0.3% | 5% | 12% | 26% | 38% | 49% |
+  | wins vs `random` | 98% | 99% | 100% | 100% | 100% | 100% | 100% |
+
 The arena plays two bots against each other and reports how often each
 wins:
 

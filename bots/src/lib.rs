@@ -24,16 +24,14 @@ pub const BOT_NAMES: [&str; 2] = ["random", "heuristic"];
 
 /// Makes a bot by name. The seed makes any randomness in it repeatable.
 ///
-/// `heuristic` takes optional weight overrides after a colon, e.g.
-/// `heuristic:possession=12,open_lane=30`; see [`Weights`].
+/// `heuristic` takes options after a colon: `pieces=N` to notice only N of
+/// its 7 pieces each turn, which weakens it, and weight overrides, e.g.
+/// `heuristic:pieces=5,possession=12`; see [`HeuristicBot`] and [`Weights`].
 pub fn make_bot(name: &str, seed: u64) -> Result<Box<dyn Bot>, String> {
     let (kind, options) = name.trim().split_once(':').unwrap_or((name.trim(), ""));
     match (kind.to_ascii_lowercase().as_str(), options) {
         ("random", "") => Ok(Box::new(RandomBot::new(seed))),
-        ("heuristic", overrides) => Ok(Box::new(HeuristicBot::new(
-            Weights::with_overrides(overrides)?,
-            seed,
-        ))),
+        ("heuristic", options) => Ok(Box::new(HeuristicBot::from_options(options, seed)?)),
         _ => Err(format!(
             "unknown bot {name:?}; expected one of: {}",
             BOT_NAMES.join(", ")
