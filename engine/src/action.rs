@@ -75,6 +75,10 @@ impl Action {
             return ActionResult::Invalid("Game is over");
         }
 
+        if state.setup() && !matches!(self, Action::Move(_)) {
+            return ActionResult::Invalid("Only moves are allowed during setup");
+        }
+
         match self {
             Action::Move(action) => action.try_apply(state),
             Action::Tackle(action) => action.try_apply(state),

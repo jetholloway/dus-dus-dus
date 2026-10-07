@@ -5,6 +5,7 @@ mod game_state;
 mod move_action;
 mod pass_action;
 mod position;
+mod rules;
 mod tackle_action;
 mod valid_actions;
 
@@ -15,5 +16,6 @@ pub use game_state::*;
 pub use move_action::*;
 pub use pass_action::*;
 pub use position::*;
+pub use rules::*;
 pub use tackle_action::*;
 pub use valid_actions::Transition;

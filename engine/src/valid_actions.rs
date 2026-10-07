@@ -128,12 +128,21 @@ mod tests {
         assert_eq!(actions, expected);
     }
 
+    const RULES: [&str; 4] = [
+        "standard",
+        "teal-ball",
+        "teal-double-setup",
+        "teal-ball+teal-double-setup",
+    ];
+
     #[test]
     fn valid_actions_agrees_with_exhaustive_search() {
         let mut rng = StdRng::seed_from_u64(20260918);
 
         for game in 0..GAMES {
-            let mut state = GameState::new();
+            // Every rule set in turn, so each gets several games.
+            let rules = Rules::parse(RULES[game % RULES.len()]).unwrap();
+            let mut state = GameState::with_rules(rules);
 
             for _ in 0..MAX_ACTIONS_PER_GAME {
                 let actions = state.valid_actions();

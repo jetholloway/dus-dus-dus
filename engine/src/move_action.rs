@@ -50,11 +50,18 @@ impl MoveAction {
             return ActionResult::Invalid("Path blocked");
         }
 
+        if self.setup_move_not_forward_from_back_rank(state) {
+            return ActionResult::Invalid("Setup moves go forward from the back rank");
+        }
+
         state.try_apply(|board| {
             board.set_space(self.src, Space::Empty);
             board.set_space(self.dst, Space::Piece(state.current_player()));
 
-            if state.setup() && state.current_player() == Player::First {
+            // The ball goes on the first piece moved by the side the rules
+            // give it to.
+            let ball_placed = state.space(state.ball()) != Space::Invalid;
+            if state.setup() && state.current_player() == state.rules().setup_ball && !ball_placed {
                 board.set_ball(self.dst);
             }
         })
@@ -82,6 +89,20 @@ impl MoveAction {
 
     fn path_too_short(&self, state: &GameState, path: &Path) -> bool {
         state.setup() && path.len() == 0
+    }
+
+    /// A setup move takes a piece from its own back rank two squares
+    /// forward. With one setup move each a full back rank allows nothing
+    /// else; a second setup move could otherwise move the first piece again.
+    fn setup_move_not_forward_from_back_rank(&self, state: &GameState) -> bool {
+        let (back_rank, forward) = match state.current_player() {
+            Player::First => (0, 2),
+            Player::Second => (6, -2),
+        };
+        state.setup()
+            && !(self.src.y == back_rank
+                && self.dst.x == self.src.x
+                && self.dst.y == back_rank + forward)
     }
 
     fn path_blocked(&self, state: &GameState, path: &Vec<Position>) -> bool {

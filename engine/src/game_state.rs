@@ -7,6 +7,10 @@ use super::*;
 pub struct GameState {
     turn: Turn,
     board: Board,
+    // States saved before rule variants existed were played by the standard
+    // rules, which is what a missing field gives.
+    #[serde(default)]
+    rules: Rules,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,10 +35,19 @@ pub enum ActionCount {
 
 impl GameState {
     pub fn new() -> Self {
+        Self::with_rules(Rules::STANDARD)
+    }
+
+    pub fn with_rules(rules: Rules) -> Self {
         Self {
             turn: Turn::new(),
             board: Board::new(),
+            rules,
         }
+    }
+
+    pub fn rules(&self) -> Rules {
+        self.rules
     }
 
     pub fn print(&self) {
@@ -56,8 +69,9 @@ impl GameState {
         }
 
         let state = Self {
-            turn: self.turn.next(),
+            turn: self.turn.next(&self.rules),
             board,
+            rules: self.rules,
         };
 
         if state.board.has_winner(self.turn.player) {
@@ -122,15 +136,20 @@ impl Turn {
         }
     }
 
-    fn next(&self) -> Self {
+    fn next(&self, rules: &Rules) -> Self {
         if self.turn_count == 0 {
-            return match self.player {
-                Player::First => Self {
+            return match (self.player, self.action_count) {
+                (Player::First, _) => Self {
                     turn_count: 0,
                     player: Player::Second,
                     action_count: ActionCount::First,
                 },
-                Player::Second => Self {
+                (Player::Second, ActionCount::First) if rules.second_setup_moves == 2 => Self {
+                    turn_count: 0,
+                    player: Player::Second,
+                    action_count: ActionCount::Second,
+                },
+                (Player::Second, _) => Self {
                     turn_count: 1,
                     player: Player::First,
                     action_count: ActionCount::First,
