@@ -144,10 +144,15 @@ impl Turn {
                     player: Player::Second,
                     action_count: ActionCount::First,
                 },
-                (Player::Second, ActionCount::First) if rules.second_setup_moves == 2 => Self {
+                (Player::Second, ActionCount::First) if rules.second_setup_moves >= 2 => Self {
                     turn_count: 0,
                     player: Player::Second,
                     action_count: ActionCount::Second,
+                },
+                (Player::Second, ActionCount::Second) if rules.second_setup_moves >= 3 => Self {
+                    turn_count: 0,
+                    player: Player::Second,
+                    action_count: ActionCount::Third,
                 },
                 (Player::Second, _) => Self {
                     turn_count: 1,

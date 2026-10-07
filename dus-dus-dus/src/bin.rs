@@ -19,8 +19,9 @@ usage:
       from the same opening, A playing Orange in one and Teal in the other.
       --opening random:N starts each trial from N turns of random play, each
       side's setup move counting as a turn; --openings reads one opening per
-      line, actions separated by commas. --rules is standard, teal-ball,
-      teal-double-setup or both joined with +. --json prints JSON.
+      line, actions separated by commas. --rules is standard, or teal-ball,
+      teal-double-setup or teal-triple-setup, joined with + to combine.
+      --json prints JSON.
       Defaults: 500 trials, the normal start, seed 0, a draw at 3000 actions,
       one thread per CPU.
   dus_dus_dus play

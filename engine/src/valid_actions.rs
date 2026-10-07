@@ -128,11 +128,12 @@ mod tests {
         assert_eq!(actions, expected);
     }
 
-    const RULES: [&str; 4] = [
+    const RULES: [&str; 5] = [
         "standard",
         "teal-ball",
         "teal-double-setup",
         "teal-ball+teal-double-setup",
+        "teal-ball+teal-triple-setup",
     ];
 
     #[test]

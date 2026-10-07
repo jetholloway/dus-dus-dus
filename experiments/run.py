@@ -166,7 +166,14 @@ def rule_variants(arena: Arena) -> list[dict]:
     brings Orange's win rate to about 50% for the bots that play well. The
     --rules option is ignored: every variant is played.
     """
-    variants = ["standard", "teal-ball", "teal-double-setup", "teal-ball+teal-double-setup"]
+    variants = [
+        "standard",
+        "teal-ball",
+        "teal-double-setup",
+        "teal-ball+teal-double-setup",
+        "teal-triple-setup",
+        "teal-ball+teal-triple-setup",
+    ]
     bots = ["random", "heuristic:pieces=4", "heuristic:pieces=7"]
     rows = []
 

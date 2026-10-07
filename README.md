@@ -222,18 +222,21 @@ play: about 64% at the heuristic bot's full strength (95% range 61–67%).
 
 `rule-variants` measures the same under setup rule variants, which the
 arena and experiments take as `--rules`: `teal-ball` gives the ball to
-Teal's setup piece instead of Orange's, `teal-double-setup` gives Teal two
-setup moves with different pieces, and `teal-ball+teal-double-setup` both,
-the ball going on Teal's first piece. Orange's win rate, 1000 games each:
+Teal's setup piece instead of Orange's, `teal-double-setup` and
+`teal-triple-setup` give Teal two or three setup moves with different
+pieces, and `+` combines them, the ball going on Teal's first piece.
+Orange's win rate, 1000 games each:
 
 | Rules | random | strength 4 | strength 7 |
 | --- | --- | --- | --- |
 | standard | 51% | 58% | 64% |
 | teal-ball | 49% | 46% | 46% |
 | teal-double-setup | 51% | 55% | 63% |
-| both | 49% | 44% | 47% |
+| teal-ball+teal-double-setup | 49% | 44% | 47% |
+| teal-triple-setup | 48% | 53% | 56% |
+| teal-ball+teal-triple-setup | 51% | 42% | 41% |
 
-Who starts with the ball matters far more than an extra setup move.
+Who starts with the ball matters far more than extra setup moves.
 
 `just play` plays a game in the terminal. Each side is `console`, where
 you type actions like `MOVE A1 A3`, or a bot's name.
