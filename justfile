@@ -43,6 +43,15 @@ test-all: test test-py
 arena a="random" b="random" trials="500" *options="":
     cargo run --release -q -p dus-dus-dus -- arena {{a}} {{b}} --trials {{trials}} {{options}}
 
+# Run a battery of arena matches, e.g. `just experiment heuristic-strength-grid
+# --trials 200`. With no name, list them.
+experiment *args="":
+    {{mamba}} run -n {{env_name}} python experiments/run.py {{args}}
+
+# Write saved games' openings to experiments/openings.txt, for --openings.
+export-openings *args="":
+    {{mamba}} run -n {{env_name}} python experiments/export_openings.py {{args}}
+
 # Play in the terminal, against a bot or another person.
 play:
     cargo run --release -q -p dus-dus-dus -- play

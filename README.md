@@ -174,6 +174,38 @@ the colour decided it), and the mean game length. `--json` prints the same
 as JSON for scripts. Everything is derived from the seed (`--seed`, default
 0), so the same command gives the same results whatever the thread count.
 
+### Experiments
+
+`experiments/run.py` runs named batteries of arena matches. Each experiment
+is a short Python function in that file; it calls the release arena with
+`--json`, prints a summary, and saves every match to
+`experiments/results/<name>-<time>.csv`, which git ignores.
+
+```bash
+just experiment                                   # list them
+just experiment heuristic-strength-grid           # 500 trials per match
+just experiment heuristic-strength-grid --trials 100 --seed 3
+```
+
+Experiments start from `random:4` openings unless given `--opening` or
+`--openings FILE`. `just export-openings` writes the first four turns of
+every saved game to `experiments/openings.txt` for `--openings` (`--turns`
+changes how many).
+
+`heuristic-strength-grid` plays every strength (`pieces=1` to `7`) against
+every other: 28 matches, about two minutes. Win rate of the row's strength
+against the column's, 500 trials each from `random:4`:
+
+|   | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **1** | 50% | 25% | 9% | 5% | 1% | 1% | 1% |
+| **2** | 75% | 52% | 23% | 12% | 7% | 4% | 3% |
+| **3** | 91% | 77% | 51% | 31% | 21% | 15% | 11% |
+| **4** | 95% | 88% | 70% | 49% | 35% | 25% | 23% |
+| **5** | 99% | 93% | 80% | 65% | 50% | 39% | 34% |
+| **6** | 99% | 96% | 86% | 75% | 61% | 51% | 42% |
+| **7** | 99% | 97% | 89% | 77% | 66% | 58% | 48% |
+
 `just play` plays a game in the terminal. Each side is `console`, where
 you type actions like `MOVE A1 A3`, or a bot's name.
 

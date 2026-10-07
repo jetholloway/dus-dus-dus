@@ -4,3 +4,6 @@ target/
 __pycache__/
 *.so
 .pytest_cache/
+# Experiment output, and openings exported from the local games database.
+experiments/results/
+experiments/openings.txt
