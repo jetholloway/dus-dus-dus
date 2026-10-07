@@ -4,9 +4,10 @@
     python experiments/run.py NAME [--trials N] [--seed S]
                                    [--opening SPEC | --openings FILE]
 
-Each experiment is a function below, registered with @experiment. It plays
-matches through `match()`, which runs the release arena binary with --json,
-and returns a list of result rows. Every row is saved, flattened, to
+Each experiment is a function below, registered with @experiment, which
+also sets the opening it starts from unless --opening or --openings says
+otherwise. It plays matches through `match()`, which runs the release arena
+binary with --json, and returns a list of result rows. Every row is saved, flattened, to
 experiments/results/NAME-<time>.csv, and the experiment prints its own
 summary as it goes.
 """
@@ -14,6 +15,7 @@ summary as it goes.
 import argparse
 import csv
 import json
+import math
 import subprocess
 import sys
 from datetime import datetime
@@ -27,10 +29,28 @@ RESULTS = HERE / "results"
 EXPERIMENTS = {}
 
 
-def experiment(function):
-    """Register an experiment under its name, with underscores as hyphens."""
-    EXPERIMENTS[function.__name__.replace("_", "-")] = function
-    return function
+def experiment(opening: str):
+    """Register an experiment under its name, with underscores as hyphens,
+    starting from `opening` (an --opening value) by default."""
+
+    def register(function):
+        function.opening = opening
+        EXPERIMENTS[function.__name__.replace("_", "-")] = function
+        return function
+
+    return register
+
+
+def wilson(successes: int, trials: int) -> tuple[float, float]:
+    """A 95% confidence interval for a proportion, as the arena reports."""
+    if trials == 0:
+        return 0.0, 1.0
+    z, n = 1.96, trials
+    p = successes / n
+    denominator = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / denominator
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denominator
+    return max(centre - half, 0.0), min(centre + half, 1.0)
 
 
 class Arena:
@@ -56,7 +76,7 @@ class Arena:
         return json.loads(result.stdout)
 
 
-@experiment
+@experiment(opening="random:4")
 def heuristic_strength_grid(arena: Arena) -> list[dict]:
     """Every heuristic strength (pieces=1 to 7) against every other.
 
@@ -87,6 +107,38 @@ def heuristic_strength_grid(arena: Arena) -> list[dict]:
     print("      " + "".join(f"{j:>7}" for j in strengths))
     for i in strengths:
         print(f"{i:>6}" + "".join(f"{100 * rate[i, j]:>6.1f}%" for j in strengths))
+    return rows
+
+
+@experiment(opening="start")
+def first_player_advantage(arena: Arena) -> list[dict]:
+    """How often Orange, who moves first, wins when both sides play alike.
+
+    Each bot plays itself, so any difference between the colours comes from
+    the colours alone. From the normal start by default: a random opening
+    always ends with Orange to move, which would mix in whatever position
+    random play left behind.
+    """
+    bots = ["random"] + [f"heuristic:pieces={strength}" for strength in range(1, 8)]
+    rows = []
+
+    print(f"{'bot':<20} {'Orange wins':>11} {'95% range':>13} {'draws':>6} {'length':>7}")
+    for bot in bots:
+        result = arena.match(bot, bot)
+        games = result["games"]
+        orange = result["a"]["wins_as_first"] + result["b"]["wins_as_first"]
+        low, high = wilson(orange, games)
+        result["orange_wins"] = orange
+        result["orange_win_rate"] = orange / games
+        result["orange_win_rate_low"] = low
+        result["orange_win_rate_high"] = high
+        rows.append(result)
+        print(
+            f"{bot:<20} {100 * orange / games:>10.1f}%"
+            f" {f'{100 * low:.1f}–{100 * high:.1f}%':>13}"
+            f" {result['draws']:>6} {result['mean_game_length']:>7.0f}",
+            flush=True,
+        )
     return rows
 
 
@@ -126,26 +178,29 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0, help="arena seed (default 0)")
     openings = parser.add_mutually_exclusive_group()
     openings.add_argument(
-        "--opening", default="random:4", help="start or random:N (default random:4)"
+        "--opening", help="start or random:N (default: the experiment's own)"
     )
     openings.add_argument("--openings", type=Path, help="file of openings, one per line")
     args = parser.parse_args()
 
     if args.name is None:
         for name, function in EXPERIMENTS.items():
-            print(f"{name}\n    {function.__doc__.splitlines()[0]}")
+            print(f"{name} (opening {function.opening})")
+            print(f"    {function.__doc__.splitlines()[0]}")
         return
     if args.name not in EXPERIMENTS:
         sys.exit(f"unknown experiment {args.name!r}; run with no name to list them")
 
+    function = EXPERIMENTS[args.name]
     opening = (
         ["--openings", str(args.openings.resolve())]
         if args.openings
-        else ["--opening", args.opening]
+        else ["--opening", args.opening or function.opening]
     )
     build()
     started = datetime.now()
-    rows = EXPERIMENTS[args.name](Arena(args.trials, args.seed, opening))
+    print(f"{args.name}: {args.trials} trials per match, {' '.join(opening)}\n")
+    rows = function(Arena(args.trials, args.seed, opening))
     print(f"\nsaved {save(args.name, rows)} after {datetime.now() - started}")
 
 

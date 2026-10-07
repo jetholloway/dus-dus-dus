@@ -189,8 +189,8 @@ just experiment heuristic-strength-grid           # 500 trials per match
 just experiment heuristic-strength-grid --trials 100 --seed 3
 ```
 
-Experiments start from `random:4` openings unless given `--opening` or
-`--openings FILE`. `just export-openings` writes the first four turns of
+Each experiment has its own default opening, which `just experiment` lists;
+`--opening` or `--openings FILE` overrides it. `just export-openings` writes the first four turns of
 every saved game to `experiments/openings.txt` for `--openings` (`--turns`
 changes how many).
 
@@ -207,6 +207,17 @@ against the column's, 500 trials each from `random:4`:
 | **5** | 99% | 93% | 80% | 65% | 50% | 39% | 34% |
 | **6** | 99% | 96% | 86% | 75% | 61% | 51% | 42% |
 | **7** | 99% | 97% | 89% | 77% | 66% | 58% | 48% |
+
+`first-player-advantage` has each bot play itself from the normal start,
+so any difference between the colours comes from the colours alone. Orange
+moves first; 1000 games each:
+
+| Bot | random | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Orange wins | 51% | 51% | 55% | 59% | 58% | 58% | 60% | 64% |
+
+Moving first is worth little in random play and more the better both sides
+play: about 64% at the heuristic bot's full strength (95% range 61–67%).
 
 `just play` plays a game in the terminal. Each side is `console`, where
 you type actions like `MOVE A1 A3`, or a bot's name.
