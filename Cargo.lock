@@ -861,6 +861,7 @@ dependencies = [
  "bots",
  "burn",
  "engine",
+ "serde_json",
  "text_io",
 ]
 

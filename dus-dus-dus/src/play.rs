@@ -19,7 +19,18 @@ pub fn play<'a>(
     max_actions: usize,
     print: bool,
 ) -> GameOutcome {
-    let mut state = GameState::new();
+    play_from(GameState::new(), first, second, max_actions, print)
+}
+
+/// Plays one game on from `state`, such as an arena's opening position.
+/// `max_actions` and the outcome count only the actions played from there.
+pub fn play_from<'a>(
+    mut state: GameState,
+    first: &mut (dyn Bot + 'a),
+    second: &mut (dyn Bot + 'a),
+    max_actions: usize,
+    print: bool,
+) -> GameOutcome {
     let mut think = [(Duration::ZERO, 0); 2];
     if print {
         state.print();

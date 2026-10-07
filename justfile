@@ -38,9 +38,10 @@ test-py:
 # Run every test.
 test-all: test test-py
 
-# Pit two bots against each other and report win rates, e.g. `just arena random random 1000`.
-arena a="random" b="random" games="1000" *options="":
-    cargo run --release -q -p dus-dus-dus -- arena {{a}} {{b}} --games {{games}} {{options}}
+# Pit two bots against each other over N trials of two games each, e.g.
+# `just arena heuristic random 500 --opening random:4`.
+arena a="random" b="random" trials="500" *options="":
+    cargo run --release -q -p dus-dus-dus -- arena {{a}} {{b}} --trials {{trials}} {{options}}
 
 # Play in the terminal, against a bot or another person.
 play:

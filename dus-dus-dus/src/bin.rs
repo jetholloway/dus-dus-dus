@@ -6,15 +6,21 @@ use std::process::ExitCode;
 use std::str::FromStr;
 use text_io::read;
 
-use arena::ArenaOptions;
+use arena::{ArenaOptions, Opening};
 use bots::{make_bot, Bot, BOT_NAMES};
 use engine::*;
 
 const USAGE: &str = "\
 usage:
-  dus_dus_dus arena <bot-a> <bot-b> [--games N] [--seed S] [--max-actions M] [--threads T]
-      Play bot A against bot B, alternating sides, and report win rates.
-      Defaults: 1000 games, seed 0, a draw at 3000 actions, one thread per CPU.
+  dus_dus_dus arena <bot-a> <bot-b> [--trials N] [--opening start|random:N]
+                    [--openings FILE] [--seed S] [--max-actions M] [--threads T] [--json]
+      Play bot A against bot B and report win rates. Each trial is two games
+      from the same opening, A playing Orange in one and Teal in the other.
+      --opening random:N starts each trial from N turns of random play, each
+      side's setup move counting as a turn; --openings reads one opening per
+      line, actions separated by commas. --json prints the results as JSON.
+      Defaults: 500 trials, the normal start, seed 0, a draw at 3000 actions,
+      one thread per CPU.
   dus_dus_dus play
       Play in the terminal. Each side is `console` (you type actions) or a bot.";
 
@@ -47,11 +53,14 @@ fn parse_arena(args: &[String]) -> Result<ArenaOptions, String> {
     let mut options = ArenaOptions {
         bot_a: String::new(),
         bot_b: String::new(),
-        games: 1000,
+        trials: 500,
         seed: 0,
         max_actions: 3000,
         threads: std::thread::available_parallelism().map_or(1, |n| n.get()),
+        opening: Opening::Start,
+        json: false,
     };
+    let mut opening_given = false;
 
     let mut args = args.iter();
     while let Some(arg) = args.next() {
@@ -59,9 +68,24 @@ fn parse_arena(args: &[String]) -> Result<ArenaOptions, String> {
             bots.push(arg.clone());
             continue;
         }
+        if arg == "--json" {
+            options.json = true;
+            continue;
+        }
         let value = args.next().ok_or_else(|| format!("{arg} needs a value"))?;
         match arg.as_str() {
-            "--games" => options.games = parse_number(arg, value)?,
+            "--trials" => options.trials = parse_number(arg, value)?,
+            "--opening" | "--openings" if opening_given => {
+                return Err("give only one of --opening and --openings".into())
+            }
+            "--opening" => {
+                options.opening = Opening::parse(value)?;
+                opening_given = true;
+            }
+            "--openings" => {
+                options.opening = Opening::from_file(value)?;
+                opening_given = true;
+            }
             "--seed" => options.seed = parse_number(arg, value)?,
             "--max-actions" => options.max_actions = parse_number(arg, value)?,
             "--threads" => options.threads = parse_number(arg, value)?,
@@ -148,26 +172,36 @@ mod tests {
     fn arena_defaults() {
         let options = parse_arena(&args("random random")).unwrap();
         assert_eq!(
-            (options.games, options.seed, options.max_actions),
-            (1000, 0, 3000)
+            (options.trials, options.seed, options.max_actions),
+            (500, 0, 3000)
         );
+        assert_eq!(options.opening, Opening::Start);
+        assert!(!options.json);
     }
 
     #[test]
     fn arena_options_in_any_order() {
-        let options = parse_arena(&args("--seed 9 random --games 10 random")).unwrap();
+        let options = parse_arena(&args(
+            "--seed 9 random --trials 10 --json random --opening random:4",
+        ))
+        .unwrap();
         assert_eq!(
             (options.bot_a.as_str(), options.bot_b.as_str()),
             ("random", "random")
         );
-        assert_eq!((options.games, options.seed), (10, 9));
+        assert_eq!((options.trials, options.seed), (10, 9));
+        assert_eq!(options.opening, Opening::Random { turns: 4 });
+        assert!(options.json);
     }
 
     #[test]
     fn arena_rejects_bad_arguments() {
         assert!(parse_arena(&args("random")).is_err());
-        assert!(parse_arena(&args("random random --games")).is_err());
-        assert!(parse_arena(&args("random random --games many")).is_err());
+        assert!(parse_arena(&args("random random --trials")).is_err());
+        assert!(parse_arena(&args("random random --trials many")).is_err());
+        assert!(parse_arena(&args("random random --games 10")).is_err());
+        assert!(parse_arena(&args("random random --opening book")).is_err());
+        assert!(parse_arena(&args("random random --opening start --opening start")).is_err());
         assert!(parse_arena(&args("random random --speed 3")).is_err());
     }
 }

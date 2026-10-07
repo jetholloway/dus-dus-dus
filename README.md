@@ -146,21 +146,33 @@ that picks one action at a time. There are two:
   | wins vs `random` | 98% | 99% | 100% | 100% | 100% | 100% | 100% |
 
 The arena plays two bots against each other and reports how often each
-wins:
+wins. Any name `make_bot` takes works, options included:
 
 ```bash
-just arena random random 1000
-just arena heuristic:open_lane=30 heuristic 1000
+just arena random random 500
+just arena heuristic:pieces=5 heuristic 500 --opening random:4
 ```
 
-Bot A plays `O` in even-numbered games and `X` in odd ones, so neither
-gains from moving first. A game that reaches 3,000 actions is a draw, and
-so is one where a player has no legal action. The report gives each bot's
-wins overall and by side, a win rate with its 95% margin of error, the mean
-time a bot takes per action, and the mean game length. Extra options go
-after the game count, e.g. `just arena random random 1000 --seed 7`.
-Everything is derived from the seed (default 0), so the same command gives
-the same results.
+The number is of *trials*. A trial is two games from the same starting
+position, bot A playing Orange in one and Teal in the other, so neither the
+position nor moving first favours either bot. Starting positions:
+
+- `--opening start` (the default): the normal start of the game.
+- `--opening random:N`: N turns of random play, each side's setup move
+  counting as a turn, drawn afresh for each trial. `random:4` is both setup
+  moves and one turn each, leaving Orange to move.
+- `--openings FILE`: one opening per line, actions separated by commas,
+  such as `MOVE D1 D3, MOVE B7 B5`, used in turn. Lines the rules forbid
+  are skipped with a warning.
+
+A game that reaches 3,000 actions after the opening is a draw, and so is
+one where a player has no legal action. The report gives each bot's wins
+overall and as each colour, a win rate with its 95% range (a Wilson
+interval), the mean time a bot takes per action, how the trials went (one
+bot won both games, or they split one each, in which case the position or
+the colour decided it), and the mean game length. `--json` prints the same
+as JSON for scripts. Everything is derived from the seed (`--seed`, default
+0), so the same command gives the same results whatever the thread count.
 
 `just play` plays a game in the terminal. Each side is `console`, where
 you type actions like `MOVE A1 A3`, or a bot's name.
