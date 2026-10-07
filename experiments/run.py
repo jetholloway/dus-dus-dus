@@ -173,6 +173,7 @@ def rule_variants(arena: Arena) -> list[dict]:
         "teal-ball+teal-double-setup",
         "teal-triple-setup",
         "teal-ball+teal-triple-setup",
+        "teal-ball+orange-double-setup",
     ]
     bots = ["random", "heuristic:pieces=4", "heuristic:pieces=7"]
     rows = []

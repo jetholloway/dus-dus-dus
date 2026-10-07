@@ -20,7 +20,8 @@ usage:
       --opening random:N starts each trial from N turns of random play, each
       side's setup move counting as a turn; --openings reads one opening per
       line, actions separated by commas. --rules is standard, or teal-ball,
-      teal-double-setup or teal-triple-setup, joined with + to combine.
+      orange-double-setup, teal-double-setup or teal-triple-setup, joined
+      with + to combine.
       --json prints JSON.
       Defaults: 500 trials, the normal start, seed 0, a draw at 3000 actions,
       one thread per CPU.

@@ -138,23 +138,26 @@ impl Turn {
 
     fn next(&self, rules: &Rules) -> Self {
         if self.turn_count == 0 {
-            return match (self.player, self.action_count) {
-                (Player::First, _) => Self {
+            // Each side makes as many setup moves as the rules give it.
+            let next_action = match self.action_count {
+                ActionCount::First => Some(ActionCount::Second),
+                ActionCount::Second => Some(ActionCount::Third),
+                ActionCount::Third => None,
+            }
+            .filter(|_| self.action_count.number() < rules.setup_moves(self.player));
+
+            return match (next_action, self.player) {
+                (Some(action_count), player) => Self {
+                    turn_count: 0,
+                    player,
+                    action_count,
+                },
+                (None, Player::First) => Self {
                     turn_count: 0,
                     player: Player::Second,
                     action_count: ActionCount::First,
                 },
-                (Player::Second, ActionCount::First) if rules.second_setup_moves >= 2 => Self {
-                    turn_count: 0,
-                    player: Player::Second,
-                    action_count: ActionCount::Second,
-                },
-                (Player::Second, ActionCount::Second) if rules.second_setup_moves >= 3 => Self {
-                    turn_count: 0,
-                    player: Player::Second,
-                    action_count: ActionCount::Third,
-                },
-                (Player::Second, _) => Self {
+                (None, Player::Second) => Self {
                     turn_count: 1,
                     player: Player::First,
                     action_count: ActionCount::First,
@@ -192,6 +195,17 @@ impl Display for Turn {
                 "PLAYER {} ACTION {} / 3 TURN {}",
                 self.player, self.action_count, self.turn_count
             )
+        }
+    }
+}
+
+impl ActionCount {
+    /// 1, 2 or 3.
+    pub fn number(self) -> u8 {
+        match self {
+            ActionCount::First => 1,
+            ActionCount::Second => 2,
+            ActionCount::Third => 3,
         }
     }
 }

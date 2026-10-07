@@ -6,9 +6,13 @@ use super::*;
 /// Variations on the setup, for trying to even out Orange's advantage from
 /// moving first. The default is the rulebook's.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Rules {
     /// Whose first setup move places the ball on the piece it moved.
     pub setup_ball: Player,
+    /// How many setup moves Orange (First) makes, each with a different
+    /// piece: 1 in the rulebook, or 2.
+    pub first_setup_moves: u8,
     /// How many setup moves Teal (Second) makes, each with a different
     /// piece: 1 in the rulebook, 2 or 3.
     pub second_setup_moves: u8,
@@ -23,11 +27,25 @@ impl Default for Rules {
 impl Rules {
     pub const STANDARD: Self = Self {
         setup_ball: Player::First,
+        first_setup_moves: 1,
         second_setup_moves: 1,
     };
 
     /// The names `parse` accepts, each changing one thing from the rulebook.
-    pub const VARIANTS: [&'static str; 3] = ["teal-ball", "teal-double-setup", "teal-triple-setup"];
+    pub const VARIANTS: [&'static str; 4] = [
+        "teal-ball",
+        "orange-double-setup",
+        "teal-double-setup",
+        "teal-triple-setup",
+    ];
+
+    /// How many setup moves `player` makes.
+    pub fn setup_moves(&self, player: Player) -> u8 {
+        match player {
+            Player::First => self.first_setup_moves,
+            Player::Second => self.second_setup_moves,
+        }
+    }
 
     /// `standard`, or variants joined with `+`, e.g.
     /// `teal-ball+teal-double-setup`. At most one of the setup counts.
@@ -40,6 +58,7 @@ impl Rules {
         for variant in spec.split('+') {
             match variant {
                 "teal-ball" => rules.setup_ball = Player::Second,
+                "orange-double-setup" => rules.first_setup_moves = 2,
                 "teal-double-setup" | "teal-triple-setup" if rules.second_setup_moves != 1 => {
                     return Err(
                         "give at most one of teal-double-setup and teal-triple-setup".into(),
@@ -65,6 +84,9 @@ impl Display for Rules {
         let mut variants = Vec::new();
         if self.setup_ball == Player::Second {
             variants.push("teal-ball");
+        }
+        if self.first_setup_moves == 2 {
+            variants.push("orange-double-setup");
         }
         match self.second_setup_moves {
             2 => variants.push("teal-double-setup"),
@@ -110,6 +132,8 @@ mod tests {
             "teal-ball+teal-double-setup",
             "teal-triple-setup",
             "teal-ball+teal-triple-setup",
+            "teal-ball+orange-double-setup",
+            "orange-double-setup+teal-double-setup",
         ] {
             assert_eq!(Rules::parse(spec).unwrap().to_string(), spec);
         }
@@ -180,6 +204,34 @@ mod tests {
             (state.current_player(), state.setup()),
             (Player::First, false)
         );
+    }
+
+    #[test]
+    fn orange_double_setup_with_teal_ball_leaves_the_ball_to_teal() {
+        let state = GameState::with_rules(Rules::parse("teal-ball+orange-double-setup").unwrap());
+        let state = play(&state, "MOVE D1 D3");
+        assert_eq!(
+            (state.current_player(), state.setup()),
+            (Player::First, true)
+        );
+        // Not the same piece again.
+        assert!(refused(&state, "MOVE D3 D5"));
+        let state = play(&state, "MOVE B1 B3");
+        assert_eq!(state.space(state.ball()), Space::Invalid, "no ball yet");
+        let state = play(&state, "MOVE E7 E5");
+        assert_eq!(state.ball(), position("E5"));
+        assert_eq!(
+            (state.current_player(), state.setup()),
+            (Player::First, false)
+        );
+    }
+
+    #[test]
+    fn orange_double_setup_puts_orange_ball_on_its_first_piece() {
+        let state = GameState::with_rules(Rules::parse("orange-double-setup").unwrap());
+        let state = play(&state, "MOVE D1 D3");
+        let state = play(&state, "MOVE B1 B3");
+        assert_eq!(state.ball(), position("D3"));
     }
 
     #[test]

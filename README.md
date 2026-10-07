@@ -222,9 +222,10 @@ play: about 64% at the heuristic bot's full strength (95% range 61–67%).
 
 `rule-variants` measures the same under setup rule variants, which the
 arena and experiments take as `--rules`: `teal-ball` gives the ball to
-Teal's setup piece instead of Orange's, `teal-double-setup` and
-`teal-triple-setup` give Teal two or three setup moves with different
-pieces, and `+` combines them, the ball going on Teal's first piece.
+Teal's setup piece instead of Orange's, `orange-double-setup` gives Orange
+two setup moves, `teal-double-setup` and `teal-triple-setup` give Teal two
+or three, each with different pieces, and `+` combines them. The ball goes
+on the first piece its side moves.
 Orange's win rate, 1000 games each:
 
 | Rules | random | strength 4 | strength 7 |
@@ -235,6 +236,7 @@ Orange's win rate, 1000 games each:
 | teal-ball+teal-double-setup | 49% | 44% | 47% |
 | teal-triple-setup | 48% | 53% | 56% |
 | teal-ball+teal-triple-setup | 51% | 42% | 41% |
+| teal-ball+orange-double-setup | 46% | 53% | 45% |
 
 Who starts with the ball matters far more than extra setup moves.
 
