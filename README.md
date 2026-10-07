@@ -94,8 +94,10 @@ just fmt           # format the Rust code
 just lint          # check the Rust code with clippy
 ```
 
-Re-run `just develop` after changing any Rust in `engine/` or `bindings/`;
-Python only sees the engine as of the last build.
+Re-run `just develop` after changing any Rust in `engine/`, `bots/` or
+`bindings/`; Python only sees the engine as of the last build. It builds in
+release mode, since a debug build makes the web bot about sixteen times
+slower.
 
 The environment is called `dus-dus-dus` and micromamba keeps it outside the
 project directory, so nothing large lands in the repository. The recipes reach

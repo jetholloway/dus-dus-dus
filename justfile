@@ -19,9 +19,10 @@ sync:
         {{mamba}} create -y -f environment.yml
     fi
 
-# Rebuild the Rust extension into the Python environment.
+# Rebuild the Rust extension into the Python environment. Optimised, since
+# the web server's bot searches thousands of positions per action.
 develop:
-    {{mamba}} run -n {{env_name}} maturin develop --manifest-path bindings/Cargo.toml
+    {{mamba}} run -n {{env_name}} maturin develop --release --manifest-path bindings/Cargo.toml
 
 # Serve the game at http://127.0.0.1:8000, reloading when the code changes.
 serve:
