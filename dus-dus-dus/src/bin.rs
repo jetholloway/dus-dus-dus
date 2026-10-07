@@ -13,12 +13,14 @@ use engine::*;
 const USAGE: &str = "\
 usage:
   dus_dus_dus arena <bot-a> <bot-b> [--trials N] [--opening start|random:N]
-                    [--openings FILE] [--seed S] [--max-actions M] [--threads T] [--json]
+                    [--openings FILE] [--rules RULES] [--seed S] [--max-actions M]
+                    [--threads T] [--json]
       Play bot A against bot B and report win rates. Each trial is two games
       from the same opening, A playing Orange in one and Teal in the other.
       --opening random:N starts each trial from N turns of random play, each
       side's setup move counting as a turn; --openings reads one opening per
-      line, actions separated by commas. --json prints the results as JSON.
+      line, actions separated by commas. --rules is standard, teal-ball,
+      teal-double-setup or both joined with +. --json prints JSON.
       Defaults: 500 trials, the normal start, seed 0, a draw at 3000 actions,
       one thread per CPU.
   dus_dus_dus play
@@ -58,9 +60,12 @@ fn parse_arena(args: &[String]) -> Result<ArenaOptions, String> {
         max_actions: 3000,
         threads: std::thread::available_parallelism().map_or(1, |n| n.get()),
         opening: Opening::Start,
+        rules: Rules::STANDARD,
         json: false,
     };
     let mut opening_given = false;
+    // Read once the rules are known, since they decide which openings are legal.
+    let mut openings_file = None;
 
     let mut args = args.iter();
     while let Some(arg) = args.next() {
@@ -83,9 +88,10 @@ fn parse_arena(args: &[String]) -> Result<ArenaOptions, String> {
                 opening_given = true;
             }
             "--openings" => {
-                options.opening = Opening::from_file(value)?;
+                openings_file = Some(value);
                 opening_given = true;
             }
+            "--rules" => options.rules = Rules::parse(value)?,
             "--seed" => options.seed = parse_number(arg, value)?,
             "--max-actions" => options.max_actions = parse_number(arg, value)?,
             "--threads" => options.threads = parse_number(arg, value)?,
@@ -97,6 +103,9 @@ fn parse_arena(args: &[String]) -> Result<ArenaOptions, String> {
         .map_err(|bots| format!("expected two bots, got {}", bots.len()))?;
     options.bot_a = a;
     options.bot_b = b;
+    if let Some(path) = openings_file {
+        options.opening = Opening::from_file(path, options.rules)?;
+    }
     Ok(options)
 }
 
@@ -201,6 +210,7 @@ mod tests {
         assert!(parse_arena(&args("random random --trials many")).is_err());
         assert!(parse_arena(&args("random random --games 10")).is_err());
         assert!(parse_arena(&args("random random --opening book")).is_err());
+        assert!(parse_arena(&args("random random --rules turbo")).is_err());
         assert!(parse_arena(&args("random random --opening start --opening start")).is_err());
         assert!(parse_arena(&args("random random --speed 3")).is_err());
     }

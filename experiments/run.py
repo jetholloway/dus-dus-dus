@@ -1,7 +1,7 @@
 """Run a named battery of arena matches and save the results.
 
     python experiments/run.py                     # list the experiments
-    python experiments/run.py NAME [--trials N] [--seed S]
+    python experiments/run.py NAME [--trials N] [--seed S] [--rules RULES]
                                    [--opening SPEC | --openings FILE]
 
 Each experiment is a function below, registered with @experiment, which
@@ -56,17 +56,21 @@ def wilson(successes: int, trials: int) -> tuple[float, float]:
 class Arena:
     """Runs arena matches with the settings the command line gave."""
 
-    def __init__(self, trials: int, seed: int, opening: list[str]):
+    def __init__(self, trials: int, seed: int, opening: list[str], rules: str):
         self.trials = trials
         self.seed = seed
         self.opening = opening
+        self.rules = rules
 
-    def match(self, a: str, b: str, trials: int | None = None) -> dict:
+    def match(
+        self, a: str, b: str, trials: int | None = None, rules: str | None = None
+    ) -> dict:
         """Play bot A against bot B and return the arena's JSON results."""
         command = [
             str(BINARY), "arena", a, b,
             "--trials", str(trials or self.trials),
             "--seed", str(self.seed),
+            "--rules", rules or self.rules,
             *self.opening,
             "--json",
         ]  # fmt: skip
@@ -110,6 +114,26 @@ def heuristic_strength_grid(arena: Arena) -> list[dict]:
     return rows
 
 
+def orange_wins(arena: Arena, bot: str, rules: str | None = None) -> dict:
+    """A bot against itself, with how often Orange won added to the results."""
+    result = arena.match(bot, bot, rules=rules)
+    orange = result["a"]["wins_as_first"] + result["b"]["wins_as_first"]
+    low, high = wilson(orange, result["games"])
+    result["orange_wins"] = orange
+    result["orange_win_rate"] = orange / result["games"]
+    result["orange_win_rate_low"] = low
+    result["orange_win_rate_high"] = high
+    return result
+
+
+def percent_range(result: dict) -> str:
+    """Orange's win rate and its 95% range, e.g. "64.3% (61.3–67.2)"."""
+    return (
+        f"{100 * result['orange_win_rate']:.1f}%"
+        f" ({100 * result['orange_win_rate_low']:.1f}–{100 * result['orange_win_rate_high']:.1f})"
+    )
+
+
 @experiment(opening="start")
 def first_player_advantage(arena: Arena) -> list[dict]:
     """How often Orange, who moves first, wins when both sides play alike.
@@ -122,23 +146,42 @@ def first_player_advantage(arena: Arena) -> list[dict]:
     bots = ["random"] + [f"heuristic:pieces={strength}" for strength in range(1, 8)]
     rows = []
 
-    print(f"{'bot':<20} {'Orange wins':>11} {'95% range':>13} {'draws':>6} {'length':>7}")
+    print(f"{'bot':<20} {'Orange wins (95% range)':>24} {'draws':>6} {'length':>7}")
     for bot in bots:
-        result = arena.match(bot, bot)
-        games = result["games"]
-        orange = result["a"]["wins_as_first"] + result["b"]["wins_as_first"]
-        low, high = wilson(orange, games)
-        result["orange_wins"] = orange
-        result["orange_win_rate"] = orange / games
-        result["orange_win_rate_low"] = low
-        result["orange_win_rate_high"] = high
+        result = orange_wins(arena, bot)
         rows.append(result)
         print(
-            f"{bot:<20} {100 * orange / games:>10.1f}%"
-            f" {f'{100 * low:.1f}–{100 * high:.1f}%':>13}"
+            f"{bot:<20} {percent_range(result):>24}"
             f" {result['draws']:>6} {result['mean_game_length']:>7.0f}",
             flush=True,
         )
+    return rows
+
+
+@experiment(opening="start")
+def rule_variants(arena: Arena) -> list[dict]:
+    """Orange's win rate under each setup rule variant, for a few bots.
+
+    Like first-player-advantage, each bot plays itself. A fair variant
+    brings Orange's win rate to about 50% for the bots that play well. The
+    --rules option is ignored: every variant is played.
+    """
+    variants = ["standard", "teal-ball", "teal-double-setup", "teal-ball+teal-double-setup"]
+    bots = ["random", "heuristic:pieces=4", "heuristic:pieces=7"]
+    rows = []
+
+    for rules in variants:
+        print(rules)
+        for bot in bots:
+            result = orange_wins(arena, bot, rules)
+            rows.append(result)
+            print(f"    {bot:<20} Orange wins {percent_range(result)}", flush=True)
+
+    print("\nOrange's win rate:\n")
+    print(f"{'rules':<30}" + "".join(f"{bot:>22}" for bot in bots))
+    for rules in variants:
+        cells = [row for row in rows if row["rules"] == rules]
+        print(f"{rules:<30}" + "".join(f"{percent_range(row):>22}" for row in cells))
     return rows
 
 
@@ -176,6 +219,9 @@ def main() -> None:
     parser.add_argument("name", nargs="?", help="experiment to run; omit to list them")
     parser.add_argument("--trials", type=int, default=500, help="trials per match (default 500)")
     parser.add_argument("--seed", type=int, default=0, help="arena seed (default 0)")
+    parser.add_argument(
+        "--rules", default="standard", help="game rules for every match (default standard)"
+    )
     openings = parser.add_mutually_exclusive_group()
     openings.add_argument(
         "--opening", help="start or random:N (default: the experiment's own)"
@@ -199,8 +245,11 @@ def main() -> None:
     )
     build()
     started = datetime.now()
-    print(f"{args.name}: {args.trials} trials per match, {' '.join(opening)}\n")
-    rows = function(Arena(args.trials, args.seed, opening))
+    print(
+        f"{args.name}: {args.trials} trials per match, {' '.join(opening)},"
+        f" rules {args.rules}\n"
+    )
+    rows = function(Arena(args.trials, args.seed, opening, args.rules))
     print(f"\nsaved {save(args.name, rows)} after {datetime.now() - started}")
 
 

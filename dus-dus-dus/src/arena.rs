@@ -1,5 +1,5 @@
 use bots::{make_bot, Bot, RandomBot};
-use engine::{Action, ActionResult, GameState, Player};
+use engine::{Action, ActionResult, GameState, Player, Rules};
 use serde_json::json;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -17,6 +17,7 @@ pub struct ArenaOptions {
     pub max_actions: usize,
     pub threads: usize,
     pub opening: Opening,
+    pub rules: Rules,
     pub json: bool,
 }
 
@@ -47,9 +48,9 @@ impl Opening {
 
     /// One opening per line, its actions separated by commas, such as
     /// `MOVE D1 D3, MOVE B7 B5`. Blank lines and `#` comments are ignored.
-    /// An opening the rules forbid, or that already ends the game, is
-    /// skipped with a warning.
-    pub fn from_file(path: &str) -> Result<Self, String> {
+    /// An opening `rules` forbid, or that already ends the game, is skipped
+    /// with a warning.
+    pub fn from_file(path: &str, rules: Rules) -> Result<Self, String> {
         let text =
             std::fs::read_to_string(path).map_err(|error| format!("can't read {path}: {error}"))?;
         let mut openings = Vec::new();
@@ -59,7 +60,7 @@ impl Opening {
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
-            match parse_opening(line) {
+            match parse_opening(line, rules) {
                 Ok(actions) => openings.push(actions),
                 Err(error) => eprintln!("{path}:{}: skipped: {error}", index + 1),
             }
@@ -80,31 +81,31 @@ impl Opening {
     }
 
     /// The position trial `trial` starts from, and the actions leading there.
-    fn position(&self, seed: u64, trial: usize) -> GameState {
+    fn position(&self, rules: Rules, seed: u64, trial: usize) -> GameState {
         match self {
-            Opening::Start => GameState::new(),
-            Opening::Random { turns } => random_opening(*turns, seed, trial),
+            Opening::Start => GameState::with_rules(rules),
+            Opening::Random { turns } => random_opening(rules, *turns, seed, trial),
             Opening::List(openings) => {
-                replay(&openings[trial % openings.len()]).expect("checked when read")
+                replay(rules, &openings[trial % openings.len()]).expect("checked when read")
             }
         }
     }
 }
 
-fn parse_opening(line: &str) -> Result<Vec<Action>, String> {
+fn parse_opening(line: &str, rules: Rules) -> Result<Vec<Action>, String> {
     let actions = line
         .split(',')
         .map(|action| Action::from_str(action.trim()))
         .collect::<Result<Vec<_>, _>>()?;
-    let state = replay(&actions)?;
+    let state = replay(rules, &actions)?;
     if state.is_terminal() {
         return Err("the game is already over".into());
     }
     Ok(actions)
 }
 
-fn replay(actions: &[Action]) -> Result<GameState, String> {
-    let mut state = GameState::new();
+fn replay(rules: Rules, actions: &[Action]) -> Result<GameState, String> {
+    let mut state = GameState::with_rules(rules);
     for action in actions {
         state = match action.try_apply(&state) {
             ActionResult::Invalid(error) => return Err(format!("{action}: {error}")),
@@ -116,10 +117,10 @@ fn replay(actions: &[Action]) -> Result<GameState, String> {
 
 /// Random play for `turns` turns. An opening that ends the game, or leaves a
 /// side with no legal action, is thrown away and drawn again.
-fn random_opening(turns: usize, seed: u64, trial: usize) -> GameState {
+fn random_opening(rules: Rules, turns: usize, seed: u64, trial: usize) -> GameState {
     for attempt in 0u64.. {
         let mut bot = RandomBot::new(mix(seed ^ mix(trial as u64) ^ mix(!attempt)));
-        let mut state = GameState::new();
+        let mut state = GameState::with_rules(rules);
         let mut finished_turns = 0;
 
         while finished_turns < turns {
@@ -156,7 +157,9 @@ fn mix(mut x: u64) -> u64 {
 /// from the match seed and the game number, so a match gives the same
 /// results whatever the thread count.
 fn play_game(options: &ArenaOptions, game: usize) -> GameOutcome {
-    let state = options.opening.position(options.seed, game / 2);
+    let state = options
+        .opening
+        .position(options.rules, options.seed, game / 2);
     let game_seed = mix(options.seed ^ mix(game as u64));
     let mut a = bot(&options.bot_a, mix(game_seed));
     let mut b = bot(&options.bot_b, mix(game_seed ^ 1));
@@ -348,10 +351,12 @@ fn report(options: &ArenaOptions, summary: &Summary) -> String {
     let pairs = &summary.pairs;
 
     let mut out = format!(
-        "{} vs {}: {} trials ({games} games), opening {}, seed {}, draw after {} actions\n\n",
+        "{} vs {}: {} trials ({games} games), rules {}, opening {}, seed {}, \
+         draw after {} actions\n\n",
         options.bot_a,
         options.bot_b,
         options.trials,
+        options.rules,
         options.opening.describe(),
         options.seed,
         options.max_actions
@@ -402,6 +407,7 @@ fn to_json(options: &ArenaOptions, summary: &Summary) -> serde_json::Value {
         "trials": options.trials,
         "games": games,
         "opening": options.opening.describe(),
+        "rules": options.rules.to_string(),
         "seed": options.seed,
         "max_actions": options.max_actions,
         "draws": summary.capped + summary.stuck,
@@ -430,6 +436,7 @@ mod tests {
             max_actions: 3000,
             threads: 1,
             opening: Opening::Random { turns: 4 },
+            rules: Rules::STANDARD,
             json: false,
         }
     }
@@ -448,16 +455,32 @@ mod tests {
     #[test]
     fn both_games_of_a_trial_start_from_the_same_random_opening() {
         let opening = Opening::Random { turns: 4 };
-        let first = opening.position(5, 3);
+        let rules = Rules::STANDARD;
+        let first = opening.position(rules, 5, 3);
 
-        assert_eq!(first, opening.position(5, 3));
-        assert_ne!(first, opening.position(5, 4));
-        assert_ne!(first, opening.position(6, 3));
+        assert_eq!(first, opening.position(rules, 5, 3));
+        assert_ne!(first, opening.position(rules, 5, 4));
+        assert_ne!(first, opening.position(rules, 6, 3));
         // Two setup moves, then a turn each, which the engine counts as
         // turns 0, 0, 1 and 2: Orange to move, at the start of turn 3.
         assert_eq!(first.turn_count(), 3);
         assert_eq!(first.current_player(), Player::First);
         assert_eq!(first.action_count(), engine::ActionCount::First);
+    }
+
+    #[test]
+    fn games_are_played_by_the_chosen_rules() {
+        let rules = Rules::parse("teal-ball").unwrap();
+        for opening in [Opening::Start, Opening::Random { turns: 2 }] {
+            let state = opening.position(rules, 0, 0);
+            assert_eq!(state.rules(), rules, "{opening:?}");
+        }
+        // After both setup moves under teal-ball, Teal holds the ball.
+        let state = Opening::Random { turns: 2 }.position(rules, 0, 0);
+        assert_eq!(
+            state.space(state.ball()),
+            engine::Space::Piece(Player::Second)
+        );
     }
 
     #[test]
@@ -478,14 +501,14 @@ mod tests {
         )
         .unwrap();
 
-        let opening = Opening::from_file(path.to_str().unwrap()).unwrap();
+        let opening = Opening::from_file(path.to_str().unwrap(), Rules::STANDARD).unwrap();
         std::fs::remove_file(&path).unwrap();
 
         let Opening::List(openings) = &opening else {
             panic!("expected a list, got {opening:?}");
         };
         assert_eq!(openings.len(), 1);
-        assert_eq!(opening.position(0, 7).turn_count(), 1);
+        assert_eq!(opening.position(Rules::STANDARD, 0, 7).turn_count(), 1);
     }
 
     fn outcome(winner: Option<Player>, actions: usize) -> GameOutcome {
